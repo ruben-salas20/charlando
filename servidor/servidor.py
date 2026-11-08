@@ -42,7 +42,8 @@ SISTEMA = ("Eres un asistente de voz en español. Tus respuestas se leen en voz 
            "el sistema ya avisa en voz alta. Al contar lo que encontraste, resume con tus palabras "
            "y no leas URLs ni rutas. No añadas lista de fuentes ni enlaces.")
 # Lectura limitada a la carpeta de trabajo; lo que no esté aquí se rechaza solo (permission_mode="dontAsk").
-CARPETA = os.environ.get("CHARLANDO_CARPETA", "/tmp")
+CARPETA = os.environ.get("CHARLANDO_CARPETA", "/tmp/charlando")
+os.makedirs(CARPETA, exist_ok=True)  # /tmp se vacía al reiniciar
 HERRAMIENTAS = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
 PERMITIDAS = [f"{h}(/{CARPETA}/**)" for h in ("Read", "Grep", "Glob")] + ["WebSearch", "WebFetch"]
 AVISO_HERRAMIENTA = "Déjame mirarlo."
