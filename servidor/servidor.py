@@ -4,6 +4,7 @@ import gc
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -36,9 +37,20 @@ SISTEMA = ("Eres un asistente de voz en español. Tus respuestas se leen en voz 
            "Responde en dos o tres frases cortas y naturales, como en una charla; "
            "si el tema da para más, ofrece seguir en vez de alargarte. "
            "Sin markdown, sin listas y sin emojis. "
-           "No tienes herramientas: no ofrezcas buscar, abrir ni consultar nada.")
+           "Puedes leer y buscar archivos dentro de tu carpeta de trabajo y buscar en la web. "
+           "Úsalo solo cuando haga falta. Antes de usar una herramienta no anuncies nada: "
+           "el sistema ya avisa en voz alta. Al contar lo que encontraste, resume con tus palabras "
+           "y no leas URLs ni rutas. No añadas lista de fuentes ni enlaces.")
+# Lectura limitada a la carpeta de trabajo; lo que no esté aquí se rechaza solo (permission_mode="dontAsk").
+CARPETA = os.environ.get("CHARLANDO_CARPETA", "/tmp")
+HERRAMIENTAS = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
+PERMITIDAS = [f"{h}(/{CARPETA}/**)" for h in ("Read", "Grep", "Glob")] + ["WebSearch", "WebFetch"]
+AVISO_HERRAMIENTA = "Déjame mirarlo."
+PENSAR = object()  # marca en la cola de frases: Claude está usando una herramienta
 FRAMES_POR_TROZO = 4  # 4 × 80 ms: decodificar frame a frame deja el TTS por debajo del tiempo real
 FIN_FRASE = ".?!:;\n"
+CIERRE = "\"'»)]”’"  # comillas y paréntesis que cierran la frase junto al punto
+FUENTES = re.compile(r"^(fuentes|sources)\s*:?$", re.IGNORECASE)
 MUESTRAS_MINIMAS = 16000 // 3  # menos de 0,33 s de audio se considera silencio
 INACTIVIDAD = int(os.environ.get("CHARLANDO_INACTIVIDAD", 180))  # segundos sin turnos antes de descargar LFM3
 
@@ -141,20 +153,28 @@ def sintetizar(texto, emisor):
 
 
 def cortar(texto):
-    """Devuelve las frases ya cerradas y el resto pendiente. No parte números como «3.5»."""
+    """Devuelve las frases ya cerradas y el resto pendiente.
+
+    Solo corta si tras la puntuación (y sus comillas de cierre) viene un espacio, así que no parte
+    «3.5», «10:30», «nota.txt» ni URLs. Si la puntuación es lo último recibido, espera al siguiente
+    carácter.
+    """
     frases, inicio = [], 0
     for i, c in enumerate(texto):
-        if c not in FIN_FRASE:
+        if c not in FIN_FRASE or i < inicio:
             continue
-        siguiente = texto[i + 1] if i + 1 < len(texto) else ""
-        if c in ".:" and siguiente.isdigit():
-            continue
-        if c == "." and not siguiente:
-            break  # el punto puede ser de un número: esperar al siguiente carácter
-        frase = texto[inicio:i + 1].strip()
+        fin = i + 1
+        while fin < len(texto) and texto[fin] in CIERRE:
+            fin += 1
+        if c != "\n":
+            if fin >= len(texto):
+                break
+            if not texto[fin].isspace():
+                continue
+        frase = texto[inicio:fin].strip()
         if frase:
             frases.append(frase)
-        inicio = i + 1
+        inicio = fin
     resto = texto[inicio:]
     if len(resto) > 200 and " " in resto[:200]:
         k = resto.rfind(" ", 0, 200)
@@ -184,6 +204,16 @@ def calentar():
     n = min(len(ref), len(por_trozos))
     log.info("Streaming del códec: %d muestras (completo: %d), diferencia máxima %.4f",
              len(por_trozos), len(ref), float(np.abs(ref[:n] - por_trozos[:n]).max()))
+
+
+def para_voz(frase):
+    """Quita lo que no se puede decir en voz alta: enlaces, URLs y marcas de markdown."""
+    frase = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", frase)
+    frase = re.sub(r"https?://\S+", "", frase)
+    frase = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s+", "", frase)
+    frase = re.sub(r"[*_#`]+", "", frase)
+    frase = re.sub(r"\s+", " ", frase).strip()
+    return frase if re.search(r"\w", frase) else ""
 
 
 def cargar_y_calentar():
@@ -243,6 +273,11 @@ async def turno_tts(sesion, cola_frases):
     while (frase := await cola_frases.get()) is not None:
         if sesion.cancelar.is_set():
             break
+        if frase is PENSAR:
+            if sesion.hablando:
+                sesion.hablando = False
+                await sesion.enviar({"type": "state", "state": "thinking"})
+            continue
         if not sesion.hablando:
             sesion.hablando = True
             await sesion.enviar({"type": "state", "state": "speaking"})
@@ -311,8 +346,10 @@ class Sesion:
     async def nueva_conversacion(self, modelo, razonar):
         await self.cerrar_turno()
         await self.cerrar_cliente()
-        opciones = ClaudeAgentOptions(model=modelo, system_prompt=SISTEMA, tools=[], setting_sources=[],
-                                      mcp_servers={}, include_partial_messages=True, cwd="/tmp",
+        opciones = ClaudeAgentOptions(model=modelo, system_prompt=SISTEMA, tools=HERRAMIENTAS,
+                                      allowed_tools=PERMITIDAS, permission_mode="dontAsk",
+                                      setting_sources=[], mcp_servers={}, include_partial_messages=True,
+                                      cwd=CARPETA, env={"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"},
                                       thinking={"type": "adaptive" if razonar else "disabled"})
         self.cliente = ClaudeSDKClient(opciones)
         await self.cliente.connect()
@@ -346,21 +383,47 @@ class Sesion:
         locutor = asyncio.create_task(turno_tts(self, cola_frases))
         pendiente = ""
         primera = True
+        en_herramientas = False  # varias herramientas seguidas llevan un solo aviso
+        callar = False  # tras «Fuentes:» solo vienen enlaces: no se dicen
+
+        async def decir(frase):
+            nonlocal primera, callar
+            if callar or FUENTES.match(frase.strip()):
+                callar = True
+                return
+            frase = para_voz(frase)
+            if not frase:
+                return
+            if primera:
+                log.info("primera frase de Claude a los %.0f ms", (time.perf_counter() - self.t_fin) * 1000)
+                primera = False
+            await cola_frases.put(frase)
+
         try:
             async for msg in self.cliente.receive_response():
                 if not isinstance(msg, StreamEvent):
                     continue
                 ev = msg.event
+                bloque = ev.get("content_block") or {}
+                if ev.get("type") == "content_block_start" and bloque.get("type") == "tool_use":
+                    log.info("  herramienta: %s", bloque.get("name"))
+                    if pendiente.strip():
+                        await decir(pendiente)
+                        pendiente = ""
+                    elif not en_herramientas:
+                        await cola_frases.put(AVISO_HERRAMIENTA)
+                    if not en_herramientas:
+                        await cola_frases.put(PENSAR)
+                    en_herramientas = True
+                    continue
                 if ev.get("type") == "content_block_delta" and ev["delta"].get("type") == "text_delta":
+                    en_herramientas = False
                     pendiente += ev["delta"]["text"]
                     frases, pendiente = cortar(pendiente)
                     for frase in frases:
-                        if primera:
-                            log.info("primera frase de Claude a los %.0f ms", (time.perf_counter() - self.t_fin) * 1000)
-                            primera = False
-                        await cola_frases.put(frase)
+                        await decir(frase)
             if pendiente.strip():
-                await cola_frases.put(pendiente.strip())
+                await decir(pendiente)
             await cola_frases.put(None)
             await locutor
         except BaseException:

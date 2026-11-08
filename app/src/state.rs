@@ -81,6 +81,10 @@ pub struct State {
     pub messages: Vec<Message>,
     /// Ya llegó `reply_end`: falta que se vacíe la cola de reproducción.
     pub reply_ended: bool,
+    /// Ya hay burbuja de Claude en este turno: lo que llegue tras una herramienta va a la misma.
+    pub reply_started: bool,
+    /// Llegó `thinking` mientras sonaba la voz: se pasa a Pensando cuando termine de sonar.
+    pub pending_thinking: bool,
     pub error: Option<String>,
     /// Nivel de audio 0..1 que se dibuja (micrófono o voz de Claude).
     pub level: f32,
@@ -102,6 +106,8 @@ impl State {
             phase: Phase::Idle,
             messages: Vec::new(),
             reply_ended: false,
+            reply_started: false,
+            pending_thinking: false,
             error: None,
             level: 0.0,
             demo_level: false,
@@ -168,6 +174,8 @@ impl State {
         }
         self.phase = Phase::Thinking;
         self.reply_ended = false;
+        self.reply_started = false;
+        self.pending_thinking = false;
         if let Some(net) = &self.net {
             self.audio.mic.end(net, Out::PttEnd);
         }
@@ -204,14 +212,18 @@ impl State {
                 }
             }
             In::State(s) => match s.as_str() {
-                "thinking" => {
-                    if self.phase != Phase::Recording {
-                        self.phase = Phase::Thinking;
-                    }
-                }
+                "thinking" => match self.phase {
+                    Phase::Speaking => self.pending_thinking = true,
+                    Phase::Recording => {}
+                    _ => self.phase = Phase::Thinking,
+                },
                 "speaking" => {
                     self.phase = Phase::Speaking;
-                    self.messages.push(Message { who: Who::Claude, text: String::new() });
+                    self.pending_thinking = false;
+                    if !self.reply_started {
+                        self.reply_started = true;
+                        self.messages.push(Message { who: Who::Claude, text: String::new() });
+                    }
                 }
                 _ => {}
             },
@@ -222,7 +234,7 @@ impl State {
             }
             In::Sentence(text) => {
                 match self.messages.last_mut() {
-                    Some(m) if m.who == Who::Claude && self.phase == Phase::Speaking => {
+                    Some(m) if m.who == Who::Claude && self.reply_started => {
                         if !m.text.is_empty() {
                             m.text.push(' ');
                         }
@@ -245,6 +257,11 @@ impl State {
         if self.reply_ended && matches!(self.phase, Phase::Thinking | Phase::Speaking) && self.audio.player.is_empty() {
             self.phase = Phase::Idle;
             self.reply_ended = false;
+            self.pending_thinking = false;
+            changed = true;
+        } else if self.pending_thinking && self.phase == Phase::Speaking && self.audio.player.is_empty() {
+            self.phase = Phase::Thinking;
+            self.pending_thinking = false;
             changed = true;
         }
         let level = match self.phase {

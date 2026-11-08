@@ -177,6 +177,25 @@ mod tests {
     }
 
     #[test]
+    fn a_tool_call_thinks_mid_turn_and_keeps_one_bubble() {
+        let mut s = connected();
+        s.ptt_down();
+        s.ptt_up();
+        s.on_message(In::Transcript("Busca algo".into()));
+        s.on_message(In::State("speaking".into()));
+        s.on_message(In::Sentence("Déjame mirarlo.".into()));
+        s.on_message(In::State("thinking".into()));
+        assert_eq!(s.phase, Phase::Speaking, "sigue hablando hasta vaciar la cola");
+        s.tick(0.0);
+        assert_eq!(s.phase, Phase::Thinking);
+        s.on_message(In::State("speaking".into()));
+        s.on_message(In::Sentence("Ya lo tengo.".into()));
+        assert_eq!(s.phase, Phase::Speaking);
+        assert_eq!(s.last_reply(), Some("Déjame mirarlo. Ya lo tengo."));
+        assert_eq!(s.messages.iter().filter(|m| m.who == Who::Claude).count(), 1);
+    }
+
+    #[test]
     fn silence_goes_back_to_idle_without_a_reply() {
         let mut s = connected();
         s.ptt_down();

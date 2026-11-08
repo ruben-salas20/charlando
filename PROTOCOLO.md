@@ -34,6 +34,7 @@ El botón «+» vuelve a la pantalla de inicio en la app. El servidor no se ente
 | `{"type":"state","state":"thinking"}` | Tras `ptt_end`: transcribe y espera a Claude |
 | `{"type":"transcript","text":"..."}` | Lo que entendió el ASR. Va en la burbuja «Tú» |
 | `{"type":"state","state":"speaking"}` | Justo antes del primer audio de la respuesta |
+| `{"type":"state","state":"thinking"}` (otra vez) | Claude va a usar una herramienta. Antes llega la frase «Déjame mirarlo.» con su audio. Después vuelve `speaking` y siguen las frases |
 | `{"type":"sentence","text":"..."}` | Una frase de la respuesta. Se envía **justo antes** de su audio. La app la va añadiendo a la burbuja «Claude» |
 | binario, **24 kHz** | Audio de la respuesta, en trozos de cualquier tamaño, en orden |
 | `{"type":"reply_end"}` | No llega más audio de este turno |
@@ -47,6 +48,7 @@ Si el ASR no saca texto (silencio), el servidor envía `transcript` con `""` y d
 
 - `recording` lo decide la app; el servidor no lo envía.
 - La app pasa a `idle` cuando llega `reply_end` **y** ha terminado de reproducir el audio que tenía en cola.
+- Un turno puede alternar `speaking` → `thinking` → `speaking` cuando Claude usa herramientas. La app pasa a `thinking` cuando termina de sonar el audio en cola, y todas las frases del turno van a la misma burbuja de Claude.
 - En `thinking` y `speaking`, la app ignora Espacio: en esta versión no se interrumpe a Claude.
 - Si se cae la conexión, la app pasa a `disconnected`. Al reconectar, vuelve a la pantalla de inicio.
 

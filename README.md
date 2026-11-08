@@ -17,6 +17,8 @@ Es una cascada de voz: **ASR → LLM → TTS**. Un modelo local, [LFM3-Audio-2B]
 | `servidor/` | Transcribe, llama a Claude y sintetiza la respuesta frase a frase | Python, Transformers, Agent SDK |
 | `despliegue/` | El comando `charlando` y el servicio de systemd del servidor | Bash, systemd |
 
+Claude puede leer y buscar archivos en una carpeta de trabajo (`CHARLANDO_CARPETA`, por defecto `/tmp`) y buscar en la web. Mientras usa una herramienta dice «Déjame mirarlo». No carga tu CLAUDE.md, tus ajustes ni tus memorias, y tampoco guarda memorias.
+
 La app y el servidor se hablan por un WebSocket. El contrato está en [PROTOCOLO.md](PROTOCOLO.md), y el diseño de la interfaz en [diseno/](diseno/).
 
 El servidor y la app pueden estar en máquinas distintas. Por ejemplo, el servidor en un equipo con GPU y la app en un portátil, unidos por una red privada como Tailscale.
@@ -93,6 +95,7 @@ El servidor lee `servidor/.env`. Todas las variables están explicadas en [servi
 | `CHARLANDO_PORT` | `8765` | Puerto |
 | `CHARLANDO_MODELO` | `LiquidAI/LFM3-Audio-2B` | Id de Hugging Face o carpeta local |
 | `CHARLANDO_INACTIVIDAD` | `180` | Segundos sin uso antes de descargar el modelo |
+| `CHARLANDO_CARPETA` | `/tmp` | Única carpeta donde Claude puede leer y buscar archivos |
 | `CHARLANDO_LIBERAR_GPU_URL` | vacía | URL que libera la GPU de otro servidor de modelos, como llama-swap |
 
 ## Licencia
