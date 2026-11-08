@@ -48,11 +48,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.Placeholder
@@ -65,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -408,9 +415,26 @@ private fun Pie(s: Estado, onTap: () -> Unit) {
     }
 }
 
+/** Renglones visibles de la pregunta (luego «…») y de la respuesta (los últimos). */
+private const val QUESTION_LINES = 3
+private const val REPLY_LINES = 4
+/** Lo que ocupa el desvanecido de arriba de la respuesta. */
+private val ReplyFade = 22.dp
+private val VoiceGap = 8.dp
+
+/** Desvanece lo que dibuja el elemento en sus `top` primeros puntos. */
+private fun Modifier.fadeTop(top: Dp) = graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+    .drawWithContent {
+        drawContent()
+        val stop = (top.toPx() / size.height).coerceIn(0f, 1f)
+        drawRect(Brush.verticalGradient(0f to Color.Transparent, stop to Color.Black), blendMode = BlendMode.DstIn)
+    }
+
 @Composable
 private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
     val showReply = s.phase == Phase.Speaking || s.phase == Phase.Idle
+    val line = with(LocalDensity.current) { (14.sp * 1.45f).toDp() }
+    val replyMax = line * REPLY_LINES + ReplyFade
     Column(
         modifier.fillMaxWidth().padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -422,16 +446,30 @@ private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
                 .tap(enabled = s.canTalk() || s.phase == Phase.Recording, onClick = onTap),
         )
         Text(bigLabel(s), style = style(19.sp, FontWeight.SemiBold), textAlign = TextAlign.Center)
-        Column(Modifier.widthIn(max = 300.dp).heightIn(min = 90.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Alto fijo para que la bola no se mueva con el texto.
+        Column(
+            Modifier.widthIn(max = 300.dp).height(line * QUESTION_LINES + VoiceGap + replyMax),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             s.lastQuestion()?.let {
                 Text("«$it»", style = style(14.sp, color = Fg3), textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 8.dp))
+                    maxLines = QUESTION_LINES, overflow = TextOverflow.Ellipsis)
             }
-            val reply = s.lastReply()
-            if (showReply && reply != null) {
-                Respuesta(reply, s.phase == Phase.Speaking, style(14.sp, color = Fg2).copy(textAlign = TextAlign.Center))
+            // La respuesta sigue su final y se desvanece arriba. El margen superior del contenido
+            // cae bajo el desvanecido, así que una respuesta corta se ve entera.
+            val scroll = rememberScrollState()
+            Column(
+                Modifier.padding(top = VoiceGap).heightIn(max = replyMax).fadeTop(ReplyFade)
+                    .verticalScroll(scroll).padding(top = ReplyFade),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                val reply = s.lastReply()
+                if (showReply && reply != null) {
+                    Respuesta(reply, s.phase == Phase.Speaking, style(14.sp, color = Fg2).copy(textAlign = TextAlign.Center))
+                }
+                s.error?.let { Text("Error: $it", style = style(13.sp, color = Rec), textAlign = TextAlign.Center) }
             }
-            s.error?.let { Text("Error: $it", style = style(13.sp, color = Rec), textAlign = TextAlign.Center) }
+            LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
         }
     }
 }

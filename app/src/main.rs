@@ -85,6 +85,9 @@ fn conversation(s: &mut State, view: View, phase: Phase) {
     }
 }
 
+const LONG_QUESTION: &str = "Hola, quiero que me ayudes a pensar en cómo escribir un post para X, donde la idea es comentar un poco que estoy aprendiendo sobre un agente de voz desarrollado en tipo cascada, o sea que es un modelo ASR que pasa a un LLM, que es el que piensa y luego pasa a un text-to-speech, que es el que genera la voz.";
+const LONG_REPLY: &str = "Sí, se entiende bien, y la idea tiene mucho sentido para un post. Lo que describes es un pipeline en cascada: el audio entra por un ASR, el texto va a un LLM que razona y responde, y esa respuesta pasa a un TTS que la convierte en voz. Construirlo tú mismo en Rust, con un LLM intercambiable, es un buen ángulo porque muestra que no hace falta magia: son tres piezas conectadas y el reto está en la latencia y en cómo se pasan el turno.";
+
 const SCENES: &[(&str, fn(&mut State))] = &[
     ("inicio", |s| s.connected = true),
     ("inicio-desconectado", |s| s.connected = false),
@@ -103,6 +106,12 @@ const SCENES: &[(&str, fn(&mut State))] = &[
     ("chat-desconectado", |s| {
         conversation(s, View::Chat, Phase::Idle);
         s.connected = false;
+    }),
+    ("voz-larga", |s| {
+        conversation(s, View::Voice, Phase::Speaking);
+        let n = s.messages.len();
+        s.messages[n - 2].text = LONG_QUESTION.to_owned();
+        s.messages[n - 1].text = LONG_REPLY.to_owned();
     }),
     ("voz-desconectado", |s| {
         conversation(s, View::Voice, Phase::Idle);

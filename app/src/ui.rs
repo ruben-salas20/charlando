@@ -296,21 +296,50 @@ fn chat(s: &State, p: &Pal) -> El {
         .child(list)
 }
 
+/// Alto de una línea a 13.5 pt.
+const VOICE_LINE: f32 = 20.0;
+/// Renglones visibles de la pregunta (luego «…») y de la respuesta (los últimos).
+const QUESTION_LINES: usize = 3;
+const REPLY_LINES: f32 = 4.0;
+/// Lo que ocupa el desvanecido de arriba de la respuesta.
+const REPLY_FADE: f32 = 22.0;
+/// Separación entre la pregunta y la respuesta.
+const VOICE_GAP: f32 = 8.0;
+
 fn voice(s: &State, p: &Pal) -> El {
     let show_reply = matches!(s.phase, Phase::Speaking | Phase::Idle);
-    let mut last = col().key("ultima").w_full().max_w(320.0).min_h(80.0).items_center();
-    if let Some(q) = s.last_question() {
-        last = last.child(
-            text(format!("«{q}»")).key("pregunta").font(style(13.5, 400.0)).color(p.fg3).align(Align::Center).wrap().mb(8.0),
-        );
-    }
+    let mut reply = col().w_full().items_center().pt(REPLY_FADE);
     if show_reply && let Some(r) = s.last_reply() {
         let streaming = s.phase == Phase::Speaking;
         let body = text(r.to_owned()).key("respuesta").font(style(13.5, 400.0)).color(p.fg2).align(Align::Center).wrap();
-        last = last.child(if streaming && r.is_empty() { caret(p) } else { body });
+        reply = reply.child(if streaming && r.is_empty() { caret(p) } else { body });
     }
     if let Some(e) = &s.error {
-        last = last.child(text(format!("Error: {e}")).key("error").font(style(13.0, 400.0)).color(p.rec).align(Align::Center).wrap());
+        reply = reply.child(text(format!("Error: {e}")).key("error").font(style(13.0, 400.0)).color(p.rec).align(Align::Center).wrap());
+    }
+    // La respuesta sigue su final y se desvanece arriba. El margen superior del contenido cae
+    // bajo el desvanecido, así que una respuesta corta se ve entera.
+    let reply = col()
+        .key("respuesta-visor")
+        .w_full()
+        .mt(VOICE_GAP)
+        .min_h(0.0)
+        .max_h(REPLY_LINES * VOICE_LINE + REPLY_FADE)
+        .scroll(ScrollSpec { stick_bottom: true })
+        .clip_fade_linear(0.0, REPLY_FADE, 0.0, 0.0)
+        .child(reply);
+    // Alto fijo para que la bola no se mueva con el texto; encoge si la ventana es baja.
+    let mut last = col()
+        .key("ultima")
+        .w_full()
+        .max_w(320.0)
+        .h(QUESTION_LINES as f32 * VOICE_LINE + REPLY_LINES * VOICE_LINE + REPLY_FADE + VOICE_GAP)
+        .min_h(0.0)
+        .items_center();
+    if let Some(q) = s.last_question() {
+        last = last.child(
+            text(format!("«{q}»")).key("pregunta").font(style(13.5, 400.0)).color(p.fg3).align(Align::Center).max_lines(QUESTION_LINES),
+        );
     }
     col()
         .key("voz-vista")
@@ -322,7 +351,7 @@ fn voice(s: &State, p: &Pal) -> El {
         .center()
         .child(effect(ORB).key("bola").size(160.0, 160.0))
         .child(text(big_label(s)).key("estado-grande").font(style(17.0, 600.0)).color(p.fg).align(Align::Center))
-        .child(last)
+        .child(last.child(reply))
 }
 
 fn meter(s: &State, p: &Pal) -> El {
