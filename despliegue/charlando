@@ -15,6 +15,12 @@ remoto() {
   if [ -n "$SSH_HOST" ]; then ssh -o ConnectTimeout=5 "$SSH_HOST" "$@"; else "$@"; fi
 }
 
+# Desde el lanzador no hay terminal: los errores también van a una notificación.
+avisar() {
+  echo "$1" >&2
+  command -v notify-send >/dev/null && notify-send -a Charlando -i charlando "Charlando" "$1"
+}
+
 activo() { remoto systemctl --user is-active --quiet "$SERVICIO"; }
 
 ayuda() {
@@ -31,13 +37,13 @@ TXT
 
 abrir() {
   if [ -n "$SSH_HOST" ] && ! remoto true 2>/dev/null; then
-    echo "No llego a $SSH_HOST. ¿Está encendido y en la red?" >&2
+    avisar "No llego a $SSH_HOST. ¿Está encendido y en la red?"
     exit 1
   fi
   local arrancado=0
   if ! activo; then
     echo "Arrancando el servidor…"
-    remoto systemctl --user start "$SERVICIO" || exit 1
+    remoto systemctl --user start "$SERVICIO" || { avisar "No se pudo arrancar el servidor."; exit 1; }
     arrancado=1
   fi
   # Si este comando arrancó el servidor, lo apaga al cerrar la app; si ya estaba en marcha, lo deja.
