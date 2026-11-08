@@ -10,12 +10,13 @@ import sys
 import threading
 import time
 import traceback
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import librosa
 import numpy as np
 import torch
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, get_session_info
 from dotenv import load_dotenv
 from claude_agent_sdk.types import StreamEvent
 from transformers import AutoModelForMultimodalLM, AutoProcessor
@@ -54,6 +55,7 @@ CIERRE = "\"'»)]”’"  # comillas y paréntesis que cierran la frase junto al
 FUENTES = re.compile(r"^(fuentes|sources)\s*:?$", re.IGNORECASE)
 MUESTRAS_MINIMAS = 16000 // 3  # menos de 0,33 s de audio se considera silencio
 INACTIVIDAD = int(os.environ.get("CHARLANDO_INACTIVIDAD", 180))  # segundos sin turnos antes de descargar LFM3
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("charlando")
@@ -319,9 +321,12 @@ class Sesion:
     async def enviar(self, mensaje):
         await self.ws.send(json.dumps(mensaje))
 
-    async def error(self, texto):
+    async def error(self, texto, codigo=None):
         log.error("error: %s", texto)
-        await self.enviar({"type": "error", "message": texto})
+        mensaje = {"type": "error", "message": texto}
+        if codigo:
+            mensaje["code"] = codigo
+        await self.enviar(mensaje)
 
     def ocupada(self):
         return self.tarea is not None and not self.tarea.done()
@@ -344,19 +349,22 @@ class Sesion:
                 log.warning("No se pudo cerrar la sesión de Claude limpiamente")
         self.cliente = None
 
-    async def nueva_conversacion(self, modelo, razonar):
+    async def nueva_conversacion(self, modelo, razonar, reanudar=None):
         await self.cerrar_turno()
         await self.cerrar_cliente()
+        sesion = reanudar or str(uuid.uuid4())
+        id_sesion = {"resume": sesion} if reanudar else {"session_id": sesion}
         opciones = ClaudeAgentOptions(model=modelo, system_prompt=SISTEMA, tools=HERRAMIENTAS,
                                       allowed_tools=PERMITIDAS, permission_mode="dontAsk",
                                       setting_sources=[], mcp_servers={}, include_partial_messages=True,
                                       cwd=CARPETA, env={"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"},
-                                      thinking={"type": "adaptive" if razonar else "disabled"})
+                                      thinking={"type": "adaptive" if razonar else "disabled"},
+                                      **id_sesion)
         self.cliente = ClaudeSDKClient(opciones)
         await self.cliente.connect()
         self.modelo = modelo
-        log.info("Conversación nueva con %s", modelo)
-        await self.enviar({"type": "ready", "model": modelo})
+        log.info("Conversación %s con %s", "reanudada" if reanudar else "nueva", modelo)
+        await self.enviar({"type": "ready", "model": modelo, "session": sesion})
 
     async def turno(self, audio_bytes):
         self.t_fin = time.perf_counter()
@@ -437,8 +445,11 @@ class Sesion:
             modelo = datos.get("model")
             if modelo not in MODELOS:
                 return await self.error(f"modelo desconocido: {modelo}")
+            reanudar = datos.get("resume")
+            if reanudar is not None and not sesion_existe(reanudar):
+                return await self.error("la conversación ya no existe", "session_gone")
             en_segundo_plano(asegurar_modelo())
-            await self.nueva_conversacion(modelo, datos.get("thinking") is True)
+            await self.nueva_conversacion(modelo, datos.get("thinking") is True, reanudar)
         elif tipo == "ptt_start":
             if self.cliente is None:
                 return await self.error("no hay conversación: envía start primero")
@@ -483,6 +494,15 @@ class Sesion:
         finally:
             await self.cerrar_turno()
             await self.cerrar_cliente()
+
+
+def sesion_existe(sesion):
+    """La conversación de Claude que se quiere reanudar sigue guardada en disco."""
+    try:
+        uuid.UUID(sesion)
+    except (TypeError, ValueError, AttributeError):
+        return False
+    return get_session_info(sesion, directory=CARPETA) is not None
 
 
 async def atender(ws):

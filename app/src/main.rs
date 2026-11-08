@@ -226,7 +226,49 @@ mod tests {
         s.on_connected(false);
         s.ptt_down();
         assert_eq!(s.phase, Phase::Idle);
+        assert_eq!(s.screen, Screen::Conversation);
+    }
+
+    #[test]
+    fn reconnecting_resumes_the_conversation() {
+        let mut s = connected();
+        s.on_message(In::Ready("s1".into()));
+        s.ptt_down();
+        s.ptt_up();
+        s.on_message(In::Transcript("Hola".into()));
+        s.on_message(In::State("speaking".into()));
+        s.on_message(In::Sentence("Hola, ¿qué tal?".into()));
+        s.on_connected(false);
         s.on_connected(true);
-        assert_eq!(s.screen, Screen::Start, "al reconectar vuelve al inicio");
+        assert_eq!(s.screen, Screen::Conversation);
+        assert!(s.resuming);
+        assert!(!s.can_talk(), "no se habla hasta que llegue ready");
+        s.on_message(In::Ready("s1".into()));
+        assert!(s.can_talk());
+        assert_eq!(s.messages.len(), 2, "la conversación sigue ahí");
+    }
+
+    #[test]
+    fn a_lost_session_goes_back_to_start() {
+        let mut s = connected();
+        s.on_message(In::Ready("s1".into()));
+        s.messages.push(Message { who: Who::You, text: "Hola".into() });
+        s.on_connected(false);
+        s.on_connected(true);
+        s.on_message(In::SessionGone);
+        assert_eq!(s.screen, Screen::Start);
+        assert!(s.messages.is_empty());
+        assert_eq!(s.session, None);
+    }
+
+    #[test]
+    fn reconnecting_before_speaking_opens_a_new_session() {
+        let mut s = connected();
+        s.on_connected(false);
+        s.on_connected(true);
+        assert!(s.starting && !s.resuming);
+        s.on_message(In::Ready("s2".into()));
+        assert_eq!(s.screen, Screen::Conversation);
+        assert_eq!(s.session.as_deref(), Some("s2"));
     }
 }

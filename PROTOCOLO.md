@@ -20,6 +20,7 @@ Hay dos tipos de mensaje:
 | Mensaje | Cuándo | Efecto |
 |---|---|---|
 | `{"type":"start","model":"haiku","thinking":false}` | Al pulsar «Empezar». `model` es `haiku`, `sonnet` u `opus`. `thinking` es el interruptor «Razonar»: `true` deja que Claude decida cuándo razonar (`adaptive`), `false` lo desactiva. Si falta, vale `false` | Borra la conversación anterior y abre una nueva con ese modelo. Responde `ready` |
+| `{"type":"start","model":"haiku","thinking":false,"resume":"<id>"}` | Al reconectar dentro de una conversación. `resume` es el `session` del último `ready` | Reanuda esa conversación: Claude recuerda lo hablado. Responde `ready`, o el error `session_gone` si ya no existe |
 | `{"type":"ptt_start"}` | Al pulsar Espacio, solo en estado `idle` | Empieza un turno |
 | binario, **16 kHz** | Mientras Espacio sigue pulsado, en trozos de 20–100 ms | Audio del micrófono |
 | `{"type":"ptt_end"}` | Al soltar Espacio | Cierra el audio del turno y arranca ASR → Claude → TTS |
@@ -30,7 +31,7 @@ El botón «+» vuelve a la pantalla de inicio en la app. El servidor no se ente
 
 | Mensaje | Significado |
 |---|---|
-| `{"type":"ready","model":"haiku"}` | Conversación lista |
+| `{"type":"ready","model":"haiku","session":"<id>"}` | Conversación lista. `session` identifica la conversación para reanudarla |
 | `{"type":"state","state":"thinking"}` | Tras `ptt_end`: transcribe y espera a Claude |
 | `{"type":"transcript","text":"..."}` | Lo que entendió el ASR. Va en la burbuja «Tú» |
 | `{"type":"state","state":"speaking"}` | Justo antes del primer audio de la respuesta |
@@ -39,6 +40,7 @@ El botón «+» vuelve a la pantalla de inicio en la app. El servidor no se ente
 | binario, **24 kHz** | Audio de la respuesta, en trozos de cualquier tamaño, en orden |
 | `{"type":"reply_end"}` | No llega más audio de este turno |
 | `{"type":"error","message":"..."}` | Algo falló en el turno. El servidor vuelve a aceptar `ptt_start` |
+| `{"type":"error","message":"...","code":"session_gone"}` | La conversación pedida con `resume` ya no existe. La app vuelve a la pantalla de inicio |
 
 Si el ASR no saca texto (silencio), el servidor envía `transcript` con `""` y después `reply_end`, sin llamar a Claude.
 
@@ -50,7 +52,8 @@ Si el ASR no saca texto (silencio), el servidor envía `transcript` con `""` y d
 - La app pasa a `idle` cuando llega `reply_end` **y** ha terminado de reproducir el audio que tenía en cola.
 - Un turno puede alternar `speaking` → `thinking` → `speaking` cuando Claude usa herramientas. La app pasa a `thinking` cuando termina de sonar el audio en cola, y todas las frases del turno van a la misma burbuja de Claude.
 - En `thinking` y `speaking`, la app ignora Espacio: en esta versión no se interrumpe a Claude.
-- Si se cae la conexión, la app pasa a `disconnected`. Al reconectar, vuelve a la pantalla de inicio.
+- Si se cae la conexión, la app pasa a `disconnected` y conserva la conversación en pantalla. El turno en curso se pierde.
+- Al reconectar dentro de una conversación, la app envía `start` con `resume` y no deja hablar hasta recibir `ready`. Si aún no se había dicho nada, no hay nada que reanudar: envía un `start` normal con el mismo modelo.
 
 ## Nivel de audio para la bola
 

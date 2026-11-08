@@ -19,6 +19,8 @@ const RETRY: Duration = Duration::from_secs(2);
 #[derive(Debug, Clone, PartialEq)]
 pub enum Out {
     Start(&'static str, bool),
+    /// Reanuda la conversación con ese id tras perder la conexión.
+    Resume(&'static str, bool, String),
     PttStart,
     PttEnd,
     /// PCM 16 bits LE, mono, 16 kHz.
@@ -31,6 +33,9 @@ impl Out {
             Out::Start(model, thinking) => {
                 Message::text(json!({"type": "start", "model": model, "thinking": thinking}).to_string())
             }
+            Out::Resume(model, thinking, session) => Message::text(
+                json!({"type": "start", "model": model, "thinking": thinking, "resume": session}).to_string(),
+            ),
             Out::PttStart => Message::text(json!({"type": "ptt_start"}).to_string()),
             Out::PttEnd => Message::text(json!({"type": "ptt_end"}).to_string()),
             Out::Audio(pcm) => Message::binary(pcm),
@@ -41,23 +46,27 @@ impl Out {
 /// Del servidor a la app (los mensajes de texto; el audio va directo al reproductor).
 #[derive(Debug, Clone, PartialEq)]
 pub enum In {
+    /// El id de la conversación, para reanudarla.
     Ready(String),
     State(String),
     Transcript(String),
     Sentence(String),
     ReplyEnd,
     Error(String),
+    /// La conversación que se quería reanudar ya no existe.
+    SessionGone,
 }
 
 pub fn parse(text: &str) -> Option<In> {
     let v: Value = serde_json::from_str(text).ok()?;
     let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default().to_owned();
     Some(match v.get("type")?.as_str()? {
-        "ready" => In::Ready(s("model")),
+        "ready" => In::Ready(s("session")),
         "state" => In::State(s("state")),
         "transcript" => In::Transcript(s("text")),
         "sentence" => In::Sentence(s("text")),
         "reply_end" => In::ReplyEnd,
+        "error" if s("code") == "session_gone" => In::SessionGone,
         "error" => In::Error(s("message")),
         _ => return None,
     })
@@ -149,12 +158,13 @@ mod tests {
 
     #[test]
     fn parses_every_server_message() {
-        assert_eq!(parse(r#"{"type":"ready","model":"haiku"}"#), Some(In::Ready("haiku".into())));
+        assert_eq!(parse(r#"{"type":"ready","model":"haiku","session":"s1"}"#), Some(In::Ready("s1".into())));
         assert_eq!(parse(r#"{"type":"state","state":"speaking"}"#), Some(In::State("speaking".into())));
         assert_eq!(parse(r#"{"type":"transcript","text":""}"#), Some(In::Transcript(String::new())));
         assert_eq!(parse(r#"{"type":"sentence","text":"Hola."}"#), Some(In::Sentence("Hola.".into())));
         assert_eq!(parse(r#"{"type":"reply_end"}"#), Some(In::ReplyEnd));
         assert_eq!(parse(r#"{"type":"error","message":"x"}"#), Some(In::Error("x".into())));
+        assert_eq!(parse(r#"{"type":"error","message":"x","code":"session_gone"}"#), Some(In::SessionGone));
         assert_eq!(parse(r#"{"type":"otro"}"#), None);
     }
 
@@ -165,6 +175,10 @@ mod tests {
             _ => panic!(),
         };
         assert_eq!(text(Out::Start("opus", true)), json!({"type":"start","model":"opus","thinking":true}));
+        assert_eq!(
+            text(Out::Resume("opus", false, "s1".into())),
+            json!({"type":"start","model":"opus","thinking":false,"resume":"s1"})
+        );
         assert_eq!(text(Out::PttStart), json!({"type":"ptt_start"}));
         assert_eq!(text(Out::PttEnd), json!({"type":"ptt_end"}));
     }

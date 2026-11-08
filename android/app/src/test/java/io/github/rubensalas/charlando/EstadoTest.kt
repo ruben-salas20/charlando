@@ -32,7 +32,7 @@ class EstadoTest {
         val s = Estado({ sent.add(it) }, NullMic(), player, store)
         s.onConnected(true)
         s.start()
-        s.onMessage(In.Ready("haiku"))
+        s.onMessage(In.Ready("s1"))
         return s
     }
 
@@ -131,8 +131,48 @@ class EstadoTest {
         s.onConnected(false)
         s.tap()
         assertEquals(Phase.Idle, s.phase)
+        assertEquals(Screen.Conversation, s.screen)
+    }
+
+    @Test
+    fun reconnectingResumesTheConversation() {
+        val s = connected()
+        s.tap()
+        s.tap()
+        s.onMessage(In.Transcript("Hola"))
+        s.onMessage(In.State("speaking"))
+        s.onMessage(In.Sentence("Hola, ¿qué tal?"))
+        s.onConnected(false)
         s.onConnected(true)
-        assertEquals("al reconectar vuelve al inicio", Screen.Start, s.screen)
+        assertEquals(Screen.Conversation, s.screen)
+        assertEquals(Out.Start("haiku", false, "s1"), sent.last())
+        assertTrue("no se habla hasta que llegue ready", !s.canTalk())
+        s.onMessage(In.Ready("s1"))
+        assertTrue(s.canTalk())
+        assertEquals("la conversación sigue ahí", 2, s.messages.size)
+    }
+
+    @Test
+    fun aLostSessionGoesBackToStart() {
+        val s = connected()
+        s.messages.add(Message(Who.You, "Hola"))
+        s.onConnected(false)
+        s.onConnected(true)
+        s.onMessage(In.SessionGone)
+        assertEquals(Screen.Start, s.screen)
+        assertTrue(s.messages.isEmpty())
+        assertNull(s.session)
+    }
+
+    @Test
+    fun reconnectingBeforeSpeakingOpensANewSession() {
+        val s = connected()
+        s.onConnected(false)
+        s.onConnected(true)
+        assertEquals(Out.Start("haiku", false), sent.last())
+        s.onMessage(In.Ready("s2"))
+        assertEquals(Screen.Conversation, s.screen)
+        assertEquals("s2", s.session)
     }
 
     @Test
@@ -166,12 +206,13 @@ class EstadoTest {
 class ProtocoloTest {
     @Test
     fun parsesEveryServerMessage() {
-        assertEquals(In.Ready("haiku"), parse("""{"type":"ready","model":"haiku"}"""))
+        assertEquals(In.Ready("s1"), parse("""{"type":"ready","model":"haiku","session":"s1"}"""))
         assertEquals(In.State("speaking"), parse("""{"type":"state","state":"speaking"}"""))
         assertEquals(In.Transcript(""), parse("""{"type":"transcript","text":""}"""))
         assertEquals(In.Sentence("Hola."), parse("""{"type":"sentence","text":"Hola."}"""))
         assertEquals(In.ReplyEnd, parse("""{"type":"reply_end"}"""))
         assertEquals(In.Error("x"), parse("""{"type":"error","message":"x"}"""))
+        assertEquals(In.SessionGone, parse("""{"type":"error","message":"x","code":"session_gone"}"""))
         assertNull(parse("""{"type":"otro"}"""))
         assertNull(parse("no es json"))
     }
@@ -179,6 +220,10 @@ class ProtocoloTest {
     @Test
     fun messagesFollowTheProtocol() {
         assertEquals("""{"type":"start","model":"opus","thinking":true}""", Out.Start("opus", true).toJson())
+        assertEquals(
+            """{"type":"start","model":"opus","thinking":false,"resume":"s1"}""",
+            Out.Start("opus", false, "s1").toJson(),
+        )
         assertEquals("""{"type":"ptt_start"}""", Out.PttStart.toJson())
         assertEquals("""{"type":"ptt_end"}""", Out.PttEnd.toJson())
     }

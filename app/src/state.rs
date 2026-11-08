@@ -77,6 +77,10 @@ pub struct State {
     pub connected: bool,
     /// Se pulsó «Empezar» y esperamos `ready`.
     pub starting: bool,
+    /// Id de la conversación abierta, para reanudarla si se cae la conexión.
+    pub session: Option<String>,
+    /// Se pidió reanudar y esperamos `ready`.
+    pub resuming: bool,
     pub phase: Phase,
     pub messages: Vec<Message>,
     /// Ya llegó `reply_end`: falta que se vacíe la cola de reproducción.
@@ -103,6 +107,8 @@ impl State {
             thinking: crate::config::load_thinking(),
             connected: false,
             starting: false,
+            session: None,
+            resuming: false,
             phase: Phase::Idle,
             messages: Vec::new(),
             reply_ended: false,
@@ -140,6 +146,8 @@ impl State {
         self.audio.player.clear();
         self.screen = Screen::Start;
         self.starting = false;
+        self.session = None;
+        self.resuming = false;
         self.phase = Phase::Idle;
         self.messages.clear();
         self.reply_ended = false;
@@ -154,7 +162,7 @@ impl State {
     }
 
     pub fn can_talk(&self) -> bool {
-        self.connected && self.screen == Screen::Conversation && self.phase == Phase::Idle
+        self.connected && !self.resuming && !self.starting && self.screen == Screen::Conversation && self.phase == Phase::Idle
     }
 
     pub fn ptt_down(&mut self) {
@@ -190,20 +198,34 @@ impl State {
         self.stop_recording_silently();
         self.audio.player.clear();
         self.starting = false;
+        self.resuming = false;
         self.phase = Phase::Idle;
         self.reply_ended = false;
-        if connected {
-            // PROTOCOLO: al reconectar, vuelve a la pantalla de inicio.
-            self.screen = Screen::Start;
-            self.messages.clear();
-            self.error = None;
+        if !connected || self.screen != Screen::Conversation {
+            return;
+        }
+        // PROTOCOLO: al reconectar en una conversación, se reanuda. Sin nada dicho aún no hay
+        // sesión que reanudar: se abre otra con el mismo modelo.
+        self.error = None;
+        match self.session.clone() {
+            Some(id) if !self.messages.is_empty() => {
+                self.resuming = true;
+                self.send(Out::Resume(self.model.id(), self.thinking, id));
+            }
+            _ => {
+                self.starting = true;
+                self.send(Out::Start(self.model.id(), self.thinking));
+            }
         }
     }
 
     pub fn on_message(&mut self, msg: In) {
         match msg {
-            In::Ready(_) => {
-                if self.starting {
+            In::Ready(session) => {
+                self.session = Some(session);
+                if self.resuming {
+                    self.resuming = false;
+                } else if self.starting {
                     self.starting = false;
                     self.screen = Screen::Conversation;
                     self.phase = Phase::Idle;
@@ -244,6 +266,7 @@ impl State {
                 }
             }
             In::ReplyEnd => self.reply_ended = true,
+            In::SessionGone => self.new_conversation(),
             In::Error(message) => {
                 self.error = Some(message);
                 self.reply_ended = true;

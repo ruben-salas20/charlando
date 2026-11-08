@@ -68,6 +68,10 @@ class Estado(
     var connected by mutableStateOf(false)
     /** Se pulsó «Empezar» y esperamos `ready`. */
     var starting by mutableStateOf(false)
+    /** Id de la conversación abierta, para reanudarla si se cae la conexión. */
+    var session: String? = null
+    /** Se pidió reanudar y esperamos `ready`. */
+    var resuming by mutableStateOf(false)
     var phase by mutableStateOf(Phase.Idle)
     val messages = mutableStateListOf<Message>()
     /** Ya llegó `reply_end`: falta que se vacíe la cola de reproducción. */
@@ -102,6 +106,8 @@ class Estado(
         player.clear()
         screen = Screen.Start
         starting = false
+        session = null
+        resuming = false
         phase = Phase.Idle
         messages.clear()
         replyEnded = false
@@ -115,7 +121,7 @@ class Estado(
         }
     }
 
-    fun canTalk() = connected && screen == Screen.Conversation && phase == Phase.Idle
+    fun canTalk() = connected && !resuming && !starting && screen == Screen.Conversation && phase == Phase.Idle
 
     fun pttDown() {
         if (!canTalk()) return
@@ -143,19 +149,30 @@ class Estado(
         mic.cancel()
         player.clear()
         starting = false
+        resuming = false
         phase = Phase.Idle
         replyEnded = false
-        if (isConnected) {
-            // PROTOCOLO: al reconectar, vuelve a la pantalla de inicio.
-            screen = Screen.Start
-            messages.clear()
-            error = null
+        if (!isConnected || screen != Screen.Conversation) return
+        // PROTOCOLO: al reconectar en una conversación, se reanuda. Sin nada dicho aún no hay
+        // sesión que reanudar: se abre otra con el mismo modelo.
+        error = null
+        val id = session
+        if (id != null && messages.isNotEmpty()) {
+            resuming = true
+            send(Out.Start(model.id, thinking, id))
+        } else {
+            starting = true
+            send(Out.Start(model.id, thinking))
         }
     }
 
     fun onMessage(msg: In) {
         when (msg) {
-            is In.Ready -> if (starting) {
+            is In.Ready -> if (resuming) {
+                session = msg.session
+                resuming = false
+            } else if (starting) {
+                session = msg.session
                 starting = false
                 screen = Screen.Conversation
                 phase = Phase.Idle
@@ -189,6 +206,7 @@ class Estado(
                 }
             }
             In.ReplyEnd -> replyEnded = true
+            In.SessionGone -> newConversation()
             is In.Error -> {
                 error = msg.message
                 replyEnded = true

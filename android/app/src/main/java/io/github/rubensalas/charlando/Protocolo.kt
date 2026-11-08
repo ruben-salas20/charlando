@@ -11,7 +11,8 @@ import kotlinx.serialization.json.put
 
 /** De la app al servidor. */
 sealed interface Out {
-    data class Start(val model: String, val thinking: Boolean) : Out
+    /** `resume`: el id de la conversación que se reanuda tras perder la conexión. */
+    data class Start(val model: String, val thinking: Boolean, val resume: String? = null) : Out
     data object PttStart : Out
     data object PttEnd : Out
     /** PCM 16 bits LE, mono, 16 kHz. */
@@ -23,6 +24,7 @@ sealed interface Out {
             put("type", "start")
             put("model", model)
             put("thinking", thinking)
+            resume?.let { put("resume", it) }
         }.toString()
         PttStart -> """{"type":"ptt_start"}"""
         PttEnd -> """{"type":"ptt_end"}"""
@@ -32,24 +34,27 @@ sealed interface Out {
 
 /** Del servidor a la app (los mensajes de texto; el audio va directo al reproductor). */
 sealed interface In {
-    data class Ready(val model: String) : In
+    /** `session`: el id de la conversación, para reanudarla. */
+    data class Ready(val session: String) : In
     data class State(val state: String) : In
     data class Transcript(val text: String) : In
     data class Sentence(val text: String) : In
     data object ReplyEnd : In
     data class Error(val message: String) : In
+    /** La conversación que se quería reanudar ya no existe. */
+    data object SessionGone : In
 }
 
 fun parse(text: String): In? {
     val obj = runCatching { Json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return null
     fun s(k: String) = (obj[k] as? JsonPrimitive)?.contentOrNull ?: ""
     return when ((obj["type"] as? JsonPrimitive)?.jsonPrimitive?.contentOrNull) {
-        "ready" -> In.Ready(s("model"))
+        "ready" -> In.Ready(s("session"))
         "state" -> In.State(s("state"))
         "transcript" -> In.Transcript(s("text"))
         "sentence" -> In.Sentence(s("text"))
         "reply_end" -> In.ReplyEnd
-        "error" -> In.Error(s("message"))
+        "error" -> if (s("code") == "session_gone") In.SessionGone else In.Error(s("message"))
         else -> null
     }
 }
