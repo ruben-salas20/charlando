@@ -38,15 +38,15 @@ SISTEMA = ("Eres un asistente de voz en español. Tus respuestas se leen en voz 
            "Responde en dos o tres frases cortas y naturales, como en una charla; "
            "si el tema da para más, ofrece seguir en vez de alargarte. "
            "Sin markdown, sin listas y sin emojis. "
-           "Puedes leer y buscar archivos dentro de tu carpeta de trabajo y buscar en la web. "
+           "Puedes leer, buscar, crear y editar archivos dentro de tu carpeta de trabajo, y buscar en la web. "
            "Úsalo solo cuando haga falta. Antes de usar una herramienta no anuncies nada: "
            "el sistema ya avisa en voz alta. Al contar lo que encontraste, resume con tus palabras "
            "y no leas URLs ni rutas. No añadas lista de fuentes ni enlaces.")
-# Lectura limitada a la carpeta de trabajo; lo que no esté aquí se rechaza solo (permission_mode="dontAsk").
+# Leer y escribir solo en la carpeta de trabajo; lo que no esté aquí se rechaza solo (permission_mode="dontAsk").
 CARPETA = os.environ.get("CHARLANDO_CARPETA", "/tmp/charlando")
 os.makedirs(CARPETA, exist_ok=True)  # /tmp se vacía al reiniciar
-HERRAMIENTAS = ["Read", "Grep", "Glob", "WebSearch", "WebFetch"]
-PERMITIDAS = [f"{h}(/{CARPETA}/**)" for h in ("Read", "Grep", "Glob")] + ["WebSearch", "WebFetch"]
+HERRAMIENTAS = ["Read", "Grep", "Glob", "Write", "Edit", "WebSearch", "WebFetch"]
+PERMITIDAS = [f"{h}(/{CARPETA}/**)" for h in ("Read", "Grep", "Glob", "Write", "Edit")] + ["WebSearch", "WebFetch"]
 AVISO_HERRAMIENTA = "Déjame mirarlo."
 PENSAR = object()  # marca en la cola de frases: Claude está usando una herramienta
 FRAMES_POR_TROZO = 4  # 4 × 80 ms: decodificar frame a frame deja el TTS por debajo del tiempo real
