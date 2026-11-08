@@ -55,6 +55,9 @@ CIERRE = "\"'»)]”’"  # comillas y paréntesis que cierran la frase junto al
 FUENTES = re.compile(r"^(fuentes|sources)\s*:?$", re.IGNORECASE)
 MUESTRAS_MINIMAS = 16000 // 3  # menos de 0,33 s de audio se considera silencio
 INACTIVIDAD = int(os.environ.get("CHARLANDO_INACTIVIDAD", 180))  # segundos sin turnos antes de descargar LFM3
+# Sin memorias y sin los conectores de la cuenta de claude.ai (Canva, Notion…): Claude solo ve
+# las herramientas de HERRAMIENTAS.
+ENTORNO_CLAUDE = {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "ENABLE_CLAUDEAI_MCP_SERVERS": "false"}
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -357,7 +360,7 @@ class Sesion:
         opciones = ClaudeAgentOptions(model=modelo, system_prompt=SISTEMA, tools=HERRAMIENTAS,
                                       allowed_tools=PERMITIDAS, permission_mode="dontAsk",
                                       setting_sources=[], mcp_servers={}, include_partial_messages=True,
-                                      cwd=CARPETA, env={"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"},
+                                      cwd=CARPETA, env=ENTORNO_CLAUDE,
                                       thinking={"type": "adaptive" if razonar else "disabled"},
                                       **id_sesion)
         self.cliente = ClaudeSDKClient(opciones)

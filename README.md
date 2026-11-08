@@ -19,7 +19,7 @@ Es una cascada de voz: **ASR → LLM → TTS**. Un modelo local, [LFM3-Audio-2B]
 | `servidor/` | Transcribe, llama a Claude y sintetiza la respuesta frase a frase | Python, Transformers, Agent SDK |
 | `despliegue/` | El comando `charlando` y el servicio de systemd del servidor | Bash, systemd |
 
-Claude puede leer y buscar archivos en una carpeta de trabajo (`CHARLANDO_CARPETA`, por defecto `/tmp/charlando`) y buscar en la web. Mientras usa una herramienta dice «Déjame mirarlo». No carga tu CLAUDE.md, tus ajustes ni tus memorias, y tampoco guarda memorias.
+Claude puede leer y buscar archivos en una carpeta de trabajo (`CHARLANDO_CARPETA`, por defecto `/tmp/charlando`) y buscar en la web. Mientras usa una herramienta dice «Déjame mirarlo». No carga tu CLAUDE.md, tus ajustes, tus memorias ni los conectores de tu cuenta de claude.ai, y tampoco guarda memorias.
 
 La app y el servidor se hablan por un WebSocket. El contrato está en [PROTOCOLO.md](PROTOCOLO.md), y el diseño de la interfaz en [diseno/](diseno/).
 
