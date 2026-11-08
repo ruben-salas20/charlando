@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Charlando Android · maqueta</title>
+<style>
+  :root {
+    --bg: #141414; --l1: #1c1c1c; --l2: #232323; --l3: #2c2c2c;
+    --line: rgba(255,255,255,.08); --fg: #ededed; --fg2: #a3a3a3; --fg3: #6e6e6e;
+    --accent: #6f8fff; --rec: #e5484d; --ok: #46a758;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #0b0b0b; color: var(--fg); font: 15px/1.45 Inter, system-ui, sans-serif; padding: 28px; }
+  header.ctl { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; color: var(--fg2); font-size: 13px; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: var(--l2); border-radius: 7px; padding: 2px; }
+  .seg button { all: unset; cursor: pointer; white-space: nowrap; padding: 5px 12px; border-radius: 5px; color: var(--fg2); }
+  .seg button.on { background: var(--l3); color: var(--fg); }
+  .row { display: flex; gap: 36px; align-items: flex-start; flex-wrap: wrap; }
+  .caption { color: var(--fg2); font-size: 13px; margin: 0 0 10px 2px; max-width: 360px; }
+  .caption b { color: var(--fg); font-weight: 600; }
+
+  .phone { width: 360px; height: 780px; background: var(--bg); border: 8px solid #222; border-radius: 34px;
+           overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,.6); position: relative; }
+  .status { height: 28px; flex: none; display: flex; justify-content: space-between; align-items: center;
+            padding: 0 22px; font-size: 12px; color: var(--fg2); }
+  .bar { height: 52px; flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+         padding: 0 12px 0 18px; border-bottom: 1px solid var(--line); }
+  .name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .off .dot { background: var(--rec); }
+  .right { display: flex; justify-content: flex-end; }
+  .icon { all: unset; cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+          border-radius: 20px; color: var(--fg2); font-size: 22px; }
+  .seg.sm button { padding: 4px 12px; font-size: 13px; }
+
+  /* inicio */
+  .start { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 22px; gap: 20px; }
+  .start h1 { font-size: 26px; font-weight: 600; }
+  .start p { color: var(--fg2); margin-top: 4px; }
+  .label { font-size: 12px; color: var(--fg3); margin-bottom: 8px; }
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .opt { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+         background: var(--l1); border: 1px solid var(--line); cursor: pointer; }
+  .opt.on { border-color: var(--accent); background: var(--l2); }
+  .radio { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--fg3); flex: none; }
+  .opt.on .radio { border: 5px solid var(--accent); }
+  .opt .n { font-weight: 500; } .opt .d { color: var(--fg3); font-size: 13px; }
+  .sw-row { display: flex; align-items: center; gap: 12px; }
+  .sw-row .t { flex: 1; } .sw-row .d { color: var(--fg3); font-size: 13px; }
+  .sw { width: 44px; height: 26px; border-radius: 13px; background: var(--l3); position: relative; flex: none; }
+  .sw i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--fg); }
+  .go { all: unset; display: block; width: 100%; box-sizing: border-box; text-align: center; padding: 14px; border-radius: 14px;
+        background: #ededed; color: #141414; font-weight: 600; cursor: pointer; }
+
+  /* ajustes */
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--l1); border-top: 1px solid var(--line);
+           border-radius: 20px 20px 0 0; padding: 14px 22px 28px; display: flex; flex-direction: column; gap: 14px; }
+  .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--l3); margin: 0 auto 6px; }
+  .field { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--fg); }
+  .hint { color: var(--fg3); font-size: 12.5px; }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+
+  /* chat */
+  .chat, .voice { flex: 1; min-height: 0; }
+  .chat { padding: 18px 18px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+  .who { font-size: 12px; color: var(--fg3); margin-bottom: 3px; }
+  .you .text { color: var(--fg2); }
+  .caret { display: inline-block; width: 8px; height: 15px; background: var(--fg2); vertical-align: -2px; margin-left: 2px; border-radius: 2px; }
+  .ptt { flex: none; padding: 12px 16px 22px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .state { color: var(--fg2); font-size: 13px; }
+  .hold { width: 100%; height: 60px; border-radius: 30px; background: var(--l2); border: 1px solid var(--line);
+          display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; color: var(--fg); }
+  .rec .hold { background: var(--rec); border-color: transparent; color: #fff; }
+  .busy .hold { opacity: .45; }
+  .meter { display: flex; gap: 2px; align-items: center; height: 20px; }
+  .meter i { width: 3px; border-radius: 2px; background: currentColor; opacity: .7; }
+
+  /* voz */
+  .voice { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 20px; text-align: center; }
+  .orb { width: 220px; height: 220px; flex: none; }
+  .bigstate { font-size: 19px; font-weight: 600; }
+  .last { color: var(--fg2); font-size: 14px; min-height: 90px; max-width: 300px; }
+  .last .q { color: var(--fg3); margin-bottom: 8px; }
+  .tip { color: var(--fg3); font-size: 12.5px; padding-bottom: 22px; flex: none; text-align: center; }
+
+  [data-view="chat"] .voice, [data-view="chat"] .tip, [data-view="voz"] .chat, [data-view="voz"] .ptt { display: none; }
+</style>
+</head>
+<body>
+<header class="ctl">
+  <span>Estado:</span>
+  <div class="seg" id="seg">
+    <button data-s="idle">En espera</button><button data-s="rec">Grabando</button>
+    <button data-s="think">Pensando</button><button data-s="speak" class="on">Hablando</button>
+  </div>
+  <span style="margin-left:16px">Servidor:</span>
+  <div class="seg" id="net"><button data-c="on" class="on">Conectado</button><button data-c="off">Desconectado</button></div>
+</header>
+
+<div class="row">
+  <div>
+    <p class="caption"><b>1 · Inicio.</b> Igual que en el escritorio. El engranaje abre los ajustes.</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>▴ ▮</span></div>
+      <div class="bar"><span class="name"><span class="dot"></span>Charlando</span><span></span>
+        <span class="right"><button class="icon" title="Ajustes"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></span></div>
+      <div class="start">
+        <div><h1>Charlando</h1><p>Elige con quién hablar.</p></div>
+        <div><div class="label">Modelo</div>
+          <div class="opts">
+            <div class="opt on"><span class="radio"></span><div><div class="n">Claude Haiku 5.5</div><div class="d">El más rápido</div></div></div>
+            <div class="opt"><span class="radio"></span><div><div class="n">Claude Sonnet 5.5</div><div class="d">Equilibrado</div></div></div>
+            <div class="opt"><span class="radio"></span><div><div class="n">Claude Opus 5.5</div><div class="d">El más capaz, más lento</div></div></div>
+          </div></div>
+        <div class="sw-row"><div class="t"><div>Razonar</div><div class="d">Claude piensa cuando lo necesita. Más lento.</div></div><span class="sw"><i></i></span></div>
+        <button class="go">Empezar</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="caption"><b>2 · Ajustes.</b> Hoja que sube desde abajo. Solo la dirección del servidor.</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>▴ ▮</span></div>
+      <div class="bar"><span class="name"><span class="dot"></span>Charlando</span><span></span>
+        <span class="right"><button class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></span></div>
+      <div class="start" style="opacity:.35"><div><h1>Charlando</h1><p>Elige con quién hablar.</p></div></div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div style="font-weight:600;font-size:17px">Ajustes</div>
+        <div><div class="label">Servidor</div><div class="field">ws://IP:8765/ws</div>
+          <div class="hint" style="margin-top:6px">La dirección de tu servidor de Charlando. Con Tailscale, la IP del equipo donde corre.</div></div>
+        <button class="go">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="caption"><b>3 · Chat.</b> Abajo, un botón grande: tócalo para hablar y otra vez para enviar.</p>
+    <div class="phone conv" data-view="chat"></div>
+  </div>
+  <div>
+    <p class="caption"><b>4 · Voz.</b> La bola es el botón: tócala para hablar y otra vez para enviar.</p>
+    <div class="phone conv" data-view="voz"></div>
+  </div>
+</div>
+
+<template id="tpl">
+  <div class="status"><span>9:41</span><span>▴ ▮</span></div>
+  <div class="bar"><span class="name"><span class="dot"></span>Charlando</span>
+    <div class="seg sm"><button data-v="chat">Chat</button><button data-v="voz">Voz</button></div>
+    <span class="right"><button class="icon" title="Nueva conversación">+</button></span></div>
+  <div class="chat">
+    <div class="you"><div class="who">Tú</div><div class="text">¿Qué es un span?</div></div>
+    <div><div class="who">Claude</div><div>Es un tramo medido de una traza: tiene inicio, fin y atributos. Cada etapa de la cascada sería un span.</div></div>
+    <div class="you"><div class="who">Tú</div><div class="text">¿Y cómo veo cuál etapa es la más lenta?</div></div>
+    <div data-reply><div class="who">Claude</div><div data-t></div></div>
+  </div>
+  <div class="voice">
+    <canvas class="orb" data-preset="gunmetal" width="440" height="440"></canvas>
+    <div class="bigstate" data-big></div>
+    <div class="last"><div class="q">«¿Y cómo veo cuál etapa es la más lenta?»</div><div data-reply><span data-t></span></div></div>
+  </div>
+  <div class="tip" data-tip></div>
+  <div class="ptt"><span class="state" data-st></span>
+    <div class="hold"><div class="meter" data-n="10"></div><span data-hold></span></div></div>
+</template>
+
+<script>
+let state = "speak";
+const REPLY = "Mira el span de cada etapa: el más largo es tu cuello de botella. Aquí suele ser el ASR.";
+const ST = { idle: "", rec: "Grabando… toca para enviar", think: "Pensando…", speak: "Claude habla…" };
+const HOLD = { idle: "Toca para hablar", rec: "Toca para enviar", think: "Toca para hablar", speak: "Toca para hablar" };
+const BIG = { idle: "Toca la bola para hablar", rec: "Te escucho", think: "Pensando…", speak: "Hablando" };
+const convs = document.querySelectorAll(".conv");
+convs.forEach(c => {
+  c.append(document.getElementById("tpl").content.cloneNode(true));
+  c.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { c.dataset.view = b.dataset.v; render(); });
+});
+function render() {
+  const s = state, off = document.body.classList.contains("off");
+  document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.s === s));
+  convs.forEach(c => {
+    c.classList.toggle("rec", s === "rec");
+    c.classList.toggle("busy", s === "think" || s === "speak" || off);
+    c.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === c.dataset.view));
+    c.querySelector("[data-st]").textContent = off ? "Sin conexión. Reintentando…" : ST[s];
+    c.querySelector("[data-hold]").textContent = HOLD[s];
+    c.querySelector("[data-big]").textContent = off ? "Sin conexión" : BIG[s];
+    c.querySelector("[data-tip]").textContent = s === "idle" && !off ? "" : "";
+    const on = s === "rec" || s === "speak";
+    c.querySelectorAll("[data-n]").forEach(m => m.innerHTML = Array.from({ length: +m.dataset.n }, (_, i) =>
+      `<i style="height:${on && s === "rec" ? 4 + Math.round(Math.abs(Math.sin(i * 1.7)) * 14) : 4}px"></i>`).join(""));
+    c.querySelectorAll("[data-reply]").forEach(e => e.style.visibility = (s === "speak" || s === "idle") ? "" : "hidden");
+    c.querySelectorAll("[data-t]").forEach(e => e.innerHTML = s === "speak" ? REPLY.slice(0, 52) + '<span class="caret"></span>' : REPLY);
+  });
+}
+document.querySelectorAll("#seg button").forEach(b => b.onclick = () => { state = b.dataset.s; render(); });
+document.querySelectorAll("#net button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#net button").forEach(x => x.classList.toggle("on", x === b));
+  document.body.classList.toggle("off", b.dataset.c === "off"); render();
+});
+document.querySelectorAll(".opt").forEach(o => o.onclick = () => document.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === o)));
+render();
+</script>
+<script>
+const VS = "attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }";
+const FS = `precision highp float;
+uniform vec2 r; uniform float t, flow, scale, angle, irid, contrast, size;
+uniform vec3 tint, light;
+float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+float fbm(vec2 p){ float v=0., a=.5; for(int k=0;k<5;k++){ v+=a*n(p); p=p*2.03+vec2(1.7,9.2); a*=.5; } return v; }
+void main(){
+  vec2 uv = (gl_FragCoord.xy*2.-r)/r.y / size;
+  float d = length(uv); if(d>1.) { gl_FragColor=vec4(0.); return; }
+  vec2 q = uv*scale;
+  vec2 w = vec2(fbm(q+t*.25), fbm(q+vec2(5.2,1.3)-t*.2));
+  float e = fbm(q + flow*2.2*w + t*.1);
+  vec3 nrm = normalize(vec3(uv*(.9+.6*flow) + (w-.5)*flow*1.4, sqrt(max(0.,1.-d*d))));
+  vec3 rf = reflect(vec3(0,0,-1), nrm);
+  float c = cos(angle), s = sin(angle);
+  rf.xy = mat2(c,-s,s,c)*rf.xy;
+  float sky = smoothstep(-.15,.55, rf.y + (e-.5)*1.2*flow);
+  float band = exp(-pow((rf.y-.35+(e-.5)*.8)*5.,2.));
+  vec3 col = mix(vec3(.035), tint, sky) + band*.9*tint*light;
+  col *= .75 + .25*nrm.z;
+  float bend = 1.-nrm.z;
+  col += irid * bend * (.5+.5*cos(6.2832*(e*2.+vec3(0.,.33,.67))));
+  col = pow(col, vec3(contrast));
+  float rim = smoothstep(.93,1.,d); col = mix(col, tint*.3, rim);
+  float a = smoothstep(1.,.985,d);
+  gl_FragColor = vec4(col*a, a);
+}`;
+const hex = v => [(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255];
+const PRESETS = {
+  chrome:   { tint: hex(0xe9ecf0), light: hex(0xffffff), irid: .08, contrast: 1.0 },
+  gold:     { tint: hex(0xf3c56b), light: hex(0xfff4dc), irid: .0,  contrast: 1.0 },
+  rose:     { tint: hex(0xf2b7a2), light: hex(0xfff0ea), irid: .05, contrast: 1.0 },
+  gunmetal: { tint: hex(0x8d949e), light: hex(0xe8f0ff), irid: .12, contrast: 1.35 },
+};
+const REC_LIGHT = hex(0xff5a5a);
+// Nivel de voz simulado: en la app vendrá del micrófono o de la voz de Claude.
+const level = now => Math.min(1, Math.abs(Math.sin(now / 170) * Math.sin(now / 410)) * 1.4);
+
+function target(st, now, base, mode) {
+  const off = document.body.classList.contains("off");
+  if (off) return { flow: 0, speed: 0, scale: 1.6, size: .88, angle: 0, irid: 0, contrast: base.contrast * 1.9, light: base.light };
+  const lv = level(now);
+  switch (st) {
+    case "idle":  return { flow: .08, speed: .15, scale: 1.6, size: 1 + .025 * Math.sin(now / 650), angle: 0, irid: base.irid, contrast: base.contrast, light: base.light };
+    case "rec":   return { flow: .25 + .75 * lv, speed: -.9, scale: 2.4, size: .97 - .05 * lv, angle: 0, irid: base.irid, contrast: base.contrast, light: REC_LIGHT };
+    case "think": {
+      const b = { angle: 0, irid: base.irid, contrast: base.contrast, light: base.light };
+      if (mode === "latido") { const beat = Math.pow(.5 + .5 * Math.sin(now / 380), 3);
+        return { ...b, flow: .1 + .35 * beat, speed: .3, scale: 1.5, size: .92 + .05 * beat }; }
+      if (mode === "barrido") return { ...b, flow: .15, speed: .2, scale: 1.6, size: .94 };
+      if (mode === "hervor") return { ...b, flow: .28, speed: 2.2, scale: 4.2, size: .93 };
+      return { ...b, flow: .3, speed: .5, scale: 1.2, size: .9, irid: .55 };
+    }
+    case "speak": return { flow: .2 + .8 * lv, speed: 1, scale: 1.4, size: .96 + .07 * lv, angle: 0, irid: base.irid, contrast: base.contrast, light: base.light };
+  }
+}
+
+document.querySelectorAll("canvas.orb").forEach(cv => {
+  const base = PRESETS[cv.dataset.preset || "chrome"];
+  const mode = cv.dataset.think || "barrido";
+  const gl = cv.getContext("webgl", { premultipliedAlpha: true });
+  if (!gl) return;
+  const sh = (ty, src) => { const o = gl.createShader(ty); gl.shaderSource(o, src); gl.compileShader(o);
+    if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(pr); gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = k => gl.getUniformLocation(pr, k);
+  const cur = { flow: .08, speed: .15, scale: 1.6, size: 1, irid: base.irid, contrast: base.contrast, light: [...base.light] };
+  let tt = 0, ang = 0, last = performance.now();
+  (function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    const st = cv.dataset.think ? "think" : state;
+    const g = target(st, now, base, mode), k = Math.min(1, dt * 7);
+    for (const key of ["flow", "speed", "scale", "size", "irid", "contrast"]) cur[key] += (g[key] - cur[key]) * k;
+    for (let i = 0; i < 3; i++) cur.light[i] += (g.light[i] - cur.light[i]) * k;
+    const thinking = st === "think" && !document.body.classList.contains("off");
+    if (thinking && mode === "giro") ang = (ang + dt * 1.1) % 6.2832;
+    else if (thinking && mode === "barrido") ang = 1.1 * Math.sin(now / 700);
+    else ang += (0 - ang) * k;
+    tt += dt * cur.speed;
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.uniform2f(U("r"), cv.width, cv.height); gl.uniform1f(U("t"), tt);
+    gl.uniform1f(U("flow"), cur.flow); gl.uniform1f(U("scale"), cur.scale); gl.uniform1f(U("size"), cur.size);
+    gl.uniform1f(U("angle"), ang); gl.uniform1f(U("irid"), cur.irid); gl.uniform1f(U("contrast"), cur.contrast);
+    gl.uniform3fv(U("tint"), base.tint); gl.uniform3fv(U("light"), cur.light);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(frame);
+  })(last);
+});
+</script>
+</body>
+</html>
