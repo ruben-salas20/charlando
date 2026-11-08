@@ -1,0 +1,6 @@
+app/target/
+servidor/.venv
+__pycache__/
+.env
+*.wav
+*.log

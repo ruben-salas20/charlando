@@ -1,0 +1,10 @@
+{"events": [
+  {"t": 0.30, "type": "key", "name": " "},
+  {"t": 0.50, "type": "key", "name": " ", "repeat": true},
+  {"t": 0.70, "type": "key", "name": " ", "repeat": true},
+  {"t": 1.00, "type": "key-up", "name": " "},
+  {"t": 1.20, "type": "key", "name": " "},
+  {"t": 1.40, "type": "key-up", "name": " "},
+  {"t": 1.60, "type": "tap", "key": "voz"},
+  {"t": 2.00, "type": "mark", "name": "end"}
+]}

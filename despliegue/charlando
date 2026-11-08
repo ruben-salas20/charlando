@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Charlando: abre la app y gestiona su servidor (servicio de usuario de systemd `charlando`).
+# Configuración en ${XDG_CONFIG_HOME:-~/.config}/charlando/charlando.env (ver README).
+set -uo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/charlando/charlando.env"
+[ -f "$CONFIG" ] && . "$CONFIG"
+
+APP="${CHARLANDO_APP:-$HOME/.local/lib/charlando/charlando-app}"
+SSH_HOST="${CHARLANDO_SSH:-}"  # vacío: el servidor corre en esta misma máquina
+SERVICIO="charlando"
+export CHARLANDO_URL="${CHARLANDO_URL:-ws://127.0.0.1:8765/ws}"
+
+remoto() {
+  if [ -n "$SSH_HOST" ]; then ssh -o ConnectTimeout=5 "$SSH_HOST" "$@"; else "$@"; fi
+}
+
+activo() { remoto systemctl --user is-active --quiet "$SERVICIO"; }
+
+ayuda() {
+  cat <<'TXT'
+Uso:
+  charlando                       Arranca el servidor, abre la app y, al cerrarla, apaga el servidor
+  charlando servidor iniciar      Arranca el servidor
+  charlando servidor parar        Apaga el servidor y libera la GPU
+  charlando servidor reiniciar    Reinicia el servidor (tras cambiar su código)
+  charlando servidor estado       Dice si está en marcha y cuánta GPU se usa
+  charlando servidor registros    Muestra los registros en vivo (Ctrl+C para salir)
+TXT
+}
+
+abrir() {
+  if [ -n "$SSH_HOST" ] && ! remoto true 2>/dev/null; then
+    echo "No llego a $SSH_HOST. ¿Está encendido y en la red?" >&2
+    exit 1
+  fi
+  local arrancado=0
+  if ! activo; then
+    echo "Arrancando el servidor…"
+    remoto systemctl --user start "$SERVICIO" || exit 1
+    arrancado=1
+  fi
+  # Si este comando arrancó el servidor, lo apaga al cerrar la app; si ya estaba en marcha, lo deja.
+  if [ "$arrancado" = 1 ]; then
+    trap 'echo "Apagando el servidor…"; remoto systemctl --user stop "$SERVICIO"' EXIT
+  fi
+  "$APP"
+}
+
+servidor() {
+  case "${1:-}" in
+    iniciar)    remoto systemctl --user start "$SERVICIO" && echo "Servidor en marcha." ;;
+    parar)      remoto systemctl --user stop "$SERVICIO" && echo "Servidor apagado." ;;
+    reiniciar)  remoto systemctl --user restart "$SERVICIO" && echo "Servidor reiniciado." ;;
+    estado)
+      if activo; then echo "Servidor: en marcha"; else echo "Servidor: apagado"; fi
+      echo "GPU: $(remoto nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader)"
+      ;;
+    registros)
+      if [ -n "$SSH_HOST" ]; then ssh -t "$SSH_HOST" journalctl --user -u "$SERVICIO" -f -o cat
+      else journalctl --user -u "$SERVICIO" -f -o cat; fi
+      ;;
+    *)          ayuda; exit 1 ;;
+  esac
+}
+
+case "${1:-}" in
+  "")              abrir ;;
+  servidor)        shift; servidor "$@" ;;
+  ayuda|-h|--help) ayuda ;;
+  *)               ayuda; exit 1 ;;
+esac

@@ -1,0 +1,13 @@
+[Unit]
+Description=Charlando: servidor de la cascada de voz (LFM3 + Claude)
+
+[Service]
+# RUTA_DEL_REPO se sustituye al instalar (ver README).
+WorkingDirectory=RUTA_DEL_REPO/servidor
+ExecStart=RUTA_DEL_REPO/servidor/.venv/bin/python servidor.py
+# El Agent SDK necesita encontrar el comando `claude`.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+# Si la IP de CHARLANDO_HOST aún no existe (red privada arrancando), reintenta.
+Restart=on-failure
+RestartSec=5

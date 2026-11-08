@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Charlando · maqueta</title>
+<style>
+  :root {
+    --bg: #141414; --l1: #1c1c1c; --l2: #232323; --l3: #2c2c2c;
+    --line: rgba(255,255,255,.08); --fg: #ededed; --fg2: #a3a3a3; --fg3: #6e6e6e;
+    --accent: #6f8fff; --rec: #e5484d; --ok: #46a758;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #0b0b0b; color: var(--fg); font: 14px/1.45 Inter, system-ui, sans-serif; padding: 28px; }
+  header.ctl { display: flex; gap: 12px; align-items: center; margin-bottom: 28px; color: var(--fg2); font-size: 13px; }
+  .seg { display: inline-flex; background: var(--l2); border-radius: 7px; padding: 2px; }
+  .seg button { all: unset; cursor: pointer; white-space: nowrap; padding: 5px 12px; border-radius: 5px; color: var(--fg2); }
+  .seg button.on { background: var(--l3); color: var(--fg); }
+  .seg.sm { border-radius: 6px; }
+  .seg.sm button { padding: 2px 10px; font-size: 12px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+  .caption { color: var(--fg2); font-size: 13px; margin: 0 0 10px 2px; }
+  .caption b { color: var(--fg); font-weight: 600; }
+
+  .win { width: 440px; height: 620px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+         overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+  .title { height: 40px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 10px 0 14px;
+           border-bottom: 1px solid var(--line); font-size: 13px; color: var(--fg2); flex: none; }
+  .title .name { color: var(--fg); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .off .dot { background: var(--rec); }
+  .ghost.plus { font-size: 18px; line-height: 1; padding: 2px 8px; }
+  .title .right { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+  .conn { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .ghost { all: unset; cursor: pointer; font-size: 12px; color: var(--fg2); padding: 3px 8px; border-radius: 5px; }
+  .ghost:hover { background: var(--l2); color: var(--fg); }
+
+  /* inicio */
+  .start { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 32px; gap: 22px; }
+  .start h1 { font-size: 22px; font-weight: 600; }
+  .start p { color: var(--fg2); margin-top: 4px; }
+  .label { font-size: 12px; color: var(--fg3); margin-bottom: 8px; }
+  .opts { display: flex; flex-direction: column; gap: 6px; }
+  .opt { cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px;
+         background: var(--l1); border: 1px solid var(--line); }
+  .opt:hover { background: var(--l2); }
+  .opt.on { border-color: var(--accent); background: var(--l2); }
+  .radio { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--fg3); flex: none; }
+  .opt.on .radio { border: 4px solid var(--accent); }
+  .opt .n { font-weight: 500; }
+  .opt .d { color: var(--fg3); font-size: 12.5px; }
+  .go { all: unset; display: block; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center; padding: 10px; border-radius: 8px; background: #ededed;
+        color: #141414; font-weight: 600; }
+  .go:hover { background: #fff; }
+
+  /* chat */
+  .chat, .voice { flex: 1; min-height: 0; }
+  .chat { overflow: hidden; padding: 18px 16px; display: flex; flex-direction: column; gap: 16px; }
+  .who { font-size: 12px; color: var(--fg3); margin-bottom: 3px; }
+  .you .text { color: var(--fg2); }
+  .caret { display: inline-block; width: 7px; height: 14px; background: var(--fg2); vertical-align: -2px; margin-left: 2px; }
+
+  /* voz */
+  .voice { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; text-align: center; }
+  .big { flex: none; width: 120px; height: 120px; border-radius: 9999px; border: 2px solid var(--l3);
+         display: flex; align-items: center; justify-content: center; }
+  .orb { width: 160px; height: 160px; flex: none; }
+  .bigstate { font-size: 17px; font-weight: 600; }
+  .last { color: var(--fg2); max-width: 320px; font-size: 13.5px; min-height: 80px; }
+  .last .q { color: var(--fg3); margin-bottom: 8px; }
+
+  [data-view="chat"] .voice, [data-view="voz"] .chat { display: none; }
+  [data-view="voz"] .ptt .state, [data-view="voz"] .ptt .meter, [data-view="voz"] .ptt .recdot { display: none; }
+  [data-view="voz"] .ptt { justify-content: center; }
+
+  .ptt { flex: none; border-top: 1px solid var(--line); padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+  .key { font-family: var(--mono); font-size: 11.5px; padding: 3px 8px; border-radius: 5px; background: var(--l2);
+         border: 1px solid var(--line); color: var(--fg2); }
+  .state { flex: 1; color: var(--fg2); font-size: 13px; }
+  .meter { display: flex; gap: 2px; align-items: center; height: 20px; }
+  .meter i { width: 3px; border-radius: 2px; background: var(--fg3); }
+  .big .meter { height: 40px; gap: 3px; } .big .meter i { width: 4px; }
+  .rec .meter i { background: var(--rec); }
+  .rec .key { background: var(--rec); color: #fff; border-color: transparent; }
+  .recdot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); display: none; }
+  .rec .recdot { display: block; }
+  .colors { margin-top: 36px; }
+  .swatches { display: flex; gap: 40px; }
+  .swatches small { color: var(--fg3); font-size: 12px; }
+  .swatches figure { margin: 0; text-align: center; color: var(--fg2); font-size: 13px; }
+  .swatches .orb { width: 130px; height: 130px; display: block; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<header class="ctl">
+  <span>Estado de la conversación:</span>
+  <div class="seg" id="seg">
+    <button data-s="idle">En espera</button>
+    <button data-s="rec">Grabando</button>
+    <button data-s="think">Pensando</button>
+    <button data-s="speak" class="on">Hablando</button>
+  </div>
+  <span style="margin-left:20px">Servidor:</span>
+  <div class="seg" id="net"><button data-c="on" class="on">Conectado</button><button data-c="off">Desconectado</button></div>
+</header>
+
+<div class="row">
+  <div>
+    <p class="caption"><b>1 · Inicio.</b> Eliges el modelo y empiezas.</p>
+    <div class="win">
+      <div class="title"><span class="name"><span class="dot"></span>Charlando</span><span></span><span class="right"></span></div>
+      <div class="start">
+        <div><h1>Charlando</h1><p>Elige con quién hablar.</p></div>
+        <div>
+          <div class="label">Modelo</div>
+          <div class="opts">
+            <div class="opt on"><span class="radio"></span><div><div class="n">Claude Haiku 5.5</div><div class="d">El más rápido</div></div></div>
+            <div class="opt"><span class="radio"></span><div><div class="n">Claude Sonnet 5.5</div><div class="d">Equilibrado</div></div></div>
+            <div class="opt"><span class="radio"></span><div><div class="n">Claude Opus 5.5</div><div class="d">El más capaz, más lento</div></div></div>
+          </div>
+        </div>
+        <button class="go">Empezar</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="caption"><b>2 · Vista Chat.</b></p>
+    <div class="win conv" data-view="chat"></div>
+  </div>
+  <div>
+    <p class="caption"><b>3 · Vista Voz.</b></p>
+    <div class="win conv" data-view="voz"></div>
+  </div>
+</div>
+
+<div class="colors">
+  <p class="caption"><b>Colores.</b> Los cuatro de Rune; siguen el estado de arriba.</p>
+  <div class="swatches">
+    <figure><canvas class="orb" data-preset="chrome" width="260" height="260"></canvas><figcaption>Cromo</figcaption></figure>
+    <figure><canvas class="orb" data-preset="gold" width="260" height="260"></canvas><figcaption>Oro</figcaption></figure>
+    <figure><canvas class="orb" data-preset="rose" width="260" height="260"></canvas><figcaption>Oro rosa</figcaption></figure>
+    <figure><canvas class="orb" data-preset="gunmetal" width="260" height="260"></canvas><figcaption>Gunmetal</figcaption></figure>
+  </div>
+</div>
+
+<div class="colors">
+  <p class="caption"><b>Pensando · variantes</b> en gunmetal. Siempre muestran el estado «Pensando».</p>
+  <div class="swatches">
+    <figure><canvas class="orb" data-preset="gunmetal" data-think="giro" width="260" height="260"></canvas><figcaption>1 · Giro e irisado<br><small>la actual</small></figcaption></figure>
+    <figure><canvas class="orb" data-preset="gunmetal" data-think="latido" width="260" height="260"></canvas><figcaption>2 · Latido<br><small>late con calma</small></figcaption></figure>
+    <figure><canvas class="orb" data-preset="gunmetal" data-think="barrido" width="260" height="260"></canvas><figcaption>3 · Barrido de luz<br><small>la luz va y viene</small></figcaption></figure>
+    <figure><canvas class="orb" data-preset="gunmetal" data-think="hervor" width="260" height="260"></canvas><figcaption>4 · Hervor<br><small>ondas finas y rápidas</small></figcaption></figure>
+  </div>
+</div>
+
+<template id="tpl">
+  <div class="title">
+    <span class="name"><span class="dot"></span>Charlando</span>
+    <div class="seg sm"><button data-v="chat">Chat</button><button data-v="voz">Voz</button></div>
+    <span class="right"><button class="ghost plus" title="Nueva conversación">+</button></span>
+  </div>
+  <div class="chat">
+    <div class="you"><div class="who">Tú</div><div class="text">¿Qué es un span?</div></div>
+    <div><div class="who">Claude</div><div>Es un tramo medido de una traza: tiene inicio, fin y atributos. Cada etapa de la cascada sería un span.</div></div>
+    <div class="you"><div class="who">Tú</div><div class="text">¿Y cómo veo cuál etapa es la más lenta?</div></div>
+    <div data-reply><div class="who">Claude</div><div data-t></div></div>
+  </div>
+  <div class="voice">
+    <canvas class="orb" data-preset="gunmetal" width="320" height="320"></canvas>
+    <div class="bigstate" data-big></div>
+    <div class="last"><div class="q">«¿Y cómo veo cuál etapa es la más lenta?»</div><div data-reply><span data-t></span></div></div>
+  </div>
+  <div class="ptt">
+    <span class="recdot"></span><span class="state" data-st></span><div class="meter" data-n="14"></div><span class="key">Espacio</span>
+  </div>
+</template>
+
+<script>
+const REPLY = "Mira el span de cada etapa: el más largo es tu cuello de botella. Aquí suele ser el ASR.";
+const LABEL = { idle: "Mantén Espacio para hablar", rec: "Grabando… suelta para enviar", think: "Pensando…", speak: "Claude habla…" };
+const BIG = { idle: "Mantén Espacio para hablar", rec: "Te escucho", think: "Pensando…", speak: "Hablando" };
+let state = "speak";
+const convs = document.querySelectorAll(".conv");
+convs.forEach(c => {
+  c.append(document.getElementById("tpl").content.cloneNode(true));
+  c.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { c.dataset.view = b.dataset.v; render(); });
+});
+
+function render() {
+  const s = state, on = s === "rec" || s === "speak";
+  document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.s === s));
+  convs.forEach(c => {
+    c.classList.toggle("rec", s === "rec");
+    c.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === c.dataset.view));
+    c.querySelector("[data-st]").textContent = LABEL[s];
+    c.querySelector("[data-big]").textContent = BIG[s];
+    c.querySelectorAll("[data-n]").forEach(m => {
+      const big = !!m.closest(".big");
+      m.innerHTML = Array.from({ length: +m.dataset.n }, (_, i) =>
+        `<i style="height:${on ? 4 + Math.round(Math.abs(Math.sin(i * 1.7)) * (big ? 34 : 14)) : 4}px"></i>`).join("");
+    });
+    c.querySelectorAll("[data-reply]").forEach(e => e.style.visibility = (s === "speak" || s === "idle") ? "" : "hidden");
+    c.querySelectorAll("[data-t]").forEach(e => e.innerHTML = s === "speak" ? REPLY.slice(0, 52) + '<span class="caret"></span>' : REPLY);
+  });
+}
+document.querySelectorAll("#seg button").forEach(b => b.onclick = () => { state = b.dataset.s; render(); });
+document.querySelectorAll(".opt").forEach(o => o.onclick = () =>
+  document.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === o)));
+document.querySelectorAll("#net button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#net button").forEach(x => x.classList.toggle("on", x === b));
+  document.body.classList.toggle("off", b.dataset.c === "off");
+});
+render();
+</script>
+<script>
+const VS = "attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }";
+const FS = `precision highp float;
+uniform vec2 r; uniform float t, flow, scale, angle, irid, contrast, size;
+uniform vec3 tint, light;
+float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+float fbm(vec2 p){ float v=0., a=.5; for(int k=0;k<5;k++){ v+=a*n(p); p=p*2.03+vec2(1.7,9.2); a*=.5; } return v; }
+void main(){
+  vec2 uv = (gl_FragCoord.xy*2.-r)/r.y / size;
+  float d = length(uv); if(d>1.) { gl_FragColor=vec4(0.); return; }
+  vec2 q = uv*scale;
+  vec2 w = vec2(fbm(q+t*.25), fbm(q+vec2(5.2,1.3)-t*.2));
+  float e = fbm(q + flow*2.2*w + t*.1);
+  vec3 nrm = normalize(vec3(uv*(.9+.6*flow) + (w-.5)*flow*1.4, sqrt(max(0.,1.-d*d))));
+  vec3 rf = reflect(vec3(0,0,-1), nrm);
+  float c = cos(angle), s = sin(angle);
+  rf.xy = mat2(c,-s,s,c)*rf.xy;
+  float sky = smoothstep(-.15,.55, rf.y + (e-.5)*1.2*flow);
+  float band = exp(-pow((rf.y-.35+(e-.5)*.8)*5.,2.));
+  vec3 col = mix(vec3(.035), tint, sky) + band*.9*tint*light;
+  col *= .75 + .25*nrm.z;
+  float bend = 1.-nrm.z;
+  col += irid * bend * (.5+.5*cos(6.2832*(e*2.+vec3(0.,.33,.67))));
+  col = pow(col, vec3(contrast));
+  float rim = smoothstep(.93,1.,d); col = mix(col, tint*.3, rim);
+  float a = smoothstep(1.,.985,d);
+  gl_FragColor = vec4(col*a, a);
+}`;
+const hex = v => [(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255];
+const PRESETS = {
+  chrome:   { tint: hex(0xe9ecf0), light: hex(0xffffff), irid: .08, contrast: 1.0 },
+  gold:     { tint: hex(0xf3c56b), light: hex(0xfff4dc), irid: .0,  contrast: 1.0 },
+  rose:     { tint: hex(0xf2b7a2), light: hex(0xfff0ea), irid: .05, contrast: 1.0 },
+  gunmetal: { tint: hex(0x8d949e), light: hex(0xe8f0ff), irid: .12, contrast: 1.35 },
+};
+const REC_LIGHT = hex(0xff5a5a);
+// Nivel de voz simulado: en la app vendrá del micrófono o de la voz de Claude.
+const level = now => Math.min(1, Math.abs(Math.sin(now / 170) * Math.sin(now / 410)) * 1.4);
+
+function target(st, now, base, mode) {
+  const off = document.body.classList.contains("off");
+  if (off) return { flow: 0, speed: 0, scale: 1.6, size: .88, angle: 0, irid: 0, contrast: base.contrast * 1.9, light: base.light };
+  const lv = level(now);
+  switch (st) {
+    case "idle":  return { flow: .08, speed: .15, scale: 1.6, size: 1 + .025 * Math.sin(now / 650), angle: 0, irid: base.irid, contrast: base.contrast, light: base.light };
+    case "rec":   return { flow: .25 + .75 * lv, speed: -.9, scale: 2.4, size: .97 - .05 * lv, angle: 0, irid: base.irid, contrast: base.contrast, light: REC_LIGHT };
+    case "think": {
+      const b = { angle: 0, irid: base.irid, contrast: base.contrast, light: base.light };
+      if (mode === "latido") { const beat = Math.pow(.5 + .5 * Math.sin(now / 380), 3);
+        return { ...b, flow: .1 + .35 * beat, speed: .3, scale: 1.5, size: .92 + .05 * beat }; }
+      if (mode === "barrido") return { ...b, flow: .15, speed: .2, scale: 1.6, size: .94 };
+      if (mode === "hervor") return { ...b, flow: .28, speed: 2.2, scale: 4.2, size: .93 };
+      return { ...b, flow: .3, speed: .5, scale: 1.2, size: .9, irid: .55 };
+    }
+    case "speak": return { flow: .2 + .8 * lv, speed: 1, scale: 1.4, size: .96 + .07 * lv, angle: 0, irid: base.irid, contrast: base.contrast, light: base.light };
+  }
+}
+
+document.querySelectorAll("canvas.orb").forEach(cv => {
+  const base = PRESETS[cv.dataset.preset || "chrome"];
+  const mode = cv.dataset.think || "barrido";
+  const gl = cv.getContext("webgl", { premultipliedAlpha: true });
+  if (!gl) return;
+  const sh = (ty, src) => { const o = gl.createShader(ty); gl.shaderSource(o, src); gl.compileShader(o);
+    if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(pr); gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = k => gl.getUniformLocation(pr, k);
+  const cur = { flow: .08, speed: .15, scale: 1.6, size: 1, irid: base.irid, contrast: base.contrast, light: [...base.light] };
+  let tt = 0, ang = 0, last = performance.now();
+  (function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    const st = cv.dataset.think ? "think" : state;
+    const g = target(st, now, base, mode), k = Math.min(1, dt * 7);
+    for (const key of ["flow", "speed", "scale", "size", "irid", "contrast"]) cur[key] += (g[key] - cur[key]) * k;
+    for (let i = 0; i < 3; i++) cur.light[i] += (g.light[i] - cur.light[i]) * k;
+    const thinking = st === "think" && !document.body.classList.contains("off");
+    if (thinking && mode === "giro") ang = (ang + dt * 1.1) % 6.2832;
+    else if (thinking && mode === "barrido") ang = 1.1 * Math.sin(now / 700);
+    else ang += (0 - ang) * k;
+    tt += dt * cur.speed;
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.uniform2f(U("r"), cv.width, cv.height); gl.uniform1f(U("t"), tt);
+    gl.uniform1f(U("flow"), cur.flow); gl.uniform1f(U("scale"), cur.scale); gl.uniform1f(U("size"), cur.size);
+    gl.uniform1f(U("angle"), ang); gl.uniform1f(U("irid"), cur.irid); gl.uniform1f(U("contrast"), cur.contrast);
+    gl.uniform3fv(U("tint"), base.tint); gl.uniform3fv(U("light"), cur.light);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(frame);
+  })(last);
+});
+</script>
+</body>
+</html>

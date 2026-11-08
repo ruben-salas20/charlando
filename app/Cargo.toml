@@ -1,0 +1,20 @@
+[package]
+name = "charlando"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# Rune es prerelease: fijamos un commit de la rama dev.
+rune = { git = "https://github.com/anomalyco/rune", rev = "49db645a37bea92460a4fbcec3593f513f7d3bc0" }
+rune-fx = { git = "https://github.com/anomalyco/rune", rev = "49db645a37bea92460a4fbcec3593f513f7d3bc0" }
+wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "wgsl", "vulkan"] }
+cpal = "0.18"
+tokio = { version = "1", features = ["rt", "net", "time", "sync", "macros"] }
+tokio-tungstenite = "0.30"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 16
