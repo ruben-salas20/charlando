@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Charlando
+Comment=Habla con Claude por voz
+Exec=RUTA_DEL_COMANDO
+Icon=charlando
+StartupWMClass=charlando
+Categories=Utility;
+Keywords=voz;claude;asistente;
+Terminal=false
+Type=Application

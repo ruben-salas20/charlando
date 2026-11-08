@@ -1,3 +1,5 @@
+<p align="center"><img src="diseno/logo/charlando-1024.png" width="128" alt="Logo de Charlando: una bola de metal líquido"></p>
+
 # Charlando
 
 Habla con Claude por voz. Mantienes Espacio, hablas, sueltas, y Claude te responde en voz alta.
@@ -65,7 +67,34 @@ mkdir -p ~/.config/charlando
 cp ../despliegue/charlando.env.example ~/.config/charlando/charlando.env
 ```
 
+Para tenerla en el lanzador de apps:
+
+```sh
+for s in 48 64 128 256 512; do
+  mkdir -p ~/.local/share/icons/hicolor/${s}x${s}/apps
+  magick ../diseno/logo/charlando-1024.png -resize ${s}x${s} ~/.local/share/icons/hicolor/${s}x${s}/apps/charlando.png
+done
+sed "s|RUTA_DEL_COMANDO|$HOME/.local/bin/charlando|" ../despliegue/charlando.desktop > ~/.local/share/applications/charlando.desktop
+```
+
 Si el servidor está en otra máquina, edita `~/.config/charlando/charlando.env`: pon en `CHARLANDO_SSH` el host de ssh y en `CHARLANDO_URL` su dirección.
+
+### Android
+
+Cliente para el teléfono en `android/`, con Kotlin y Jetpack Compose. Tocas para hablar y vuelves a tocar para enviar.
+
+Requisitos:
+- Android 13 o superior.
+- Para compilar: JDK 17 o superior (con `javac`) y el SDK de Android con la plataforma 37. Gradle se descarga solo.
+
+```sh
+cd charlando/android
+echo "sdk.dir=/ruta/al/android-sdk" > local.properties
+./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+La app no trae ninguna dirección. La primera vez abre Ajustes: escribe ahí la dirección del servidor, la misma que `CHARLANDO_URL` (por ejemplo, `ws://<IP de Tailscale>:8765/ws`). Después puedes cambiarla con el engranaje de la pantalla de inicio.
 
 ## Uso
 
