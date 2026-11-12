@@ -1,5 +1,6 @@
 //! El WebSocket con el servidor, en su propio hilo con un runtime de tokio.
-//! Reintenta cada 2 s mientras no hay conexión (PROTOCOLO.md).
+//! Reintenta cada 2 s mientras no hay conexión, salvo si otro cliente se quedó el servidor
+//! (cierre 4001): entonces espera a `Out::Reconnect` (PROTOCOLO.md).
 
 use std::time::Duration;
 
@@ -14,6 +15,8 @@ use crate::state::State;
 
 pub const DEFAULT_URL: &str = "ws://127.0.0.1:8765/ws";
 const RETRY: Duration = Duration::from_secs(2);
+/// Código de cierre con el que el servidor echa a este cliente porque ha llegado otro.
+pub const CLOSE_TAKEN: u16 = 4001;
 
 /// Dónde abrir la conversación.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,10 +38,12 @@ pub enum Out {
     PermissionReply { id: String, allow: bool },
     /// PCM 16 bits LE, mono, 16 kHz.
     Audio(Vec<u8>),
+    /// «Usar aquí»: para el hilo de red, no para el servidor. Vuelve a conectar tras un cierre 4001.
+    Reconnect,
 }
 
 impl Out {
-    fn into_message(self) -> Message {
+    fn into_message(self) -> Option<Message> {
         let v = match self {
             Out::Start { place: Where::Folder(folder), model, thinking } => {
                 json!({"type": "start", "folder": folder, "model": model, "thinking": thinking})
@@ -52,9 +57,10 @@ impl Out {
             Out::PttStart => json!({"type": "ptt_start"}),
             Out::PttEnd => json!({"type": "ptt_end"}),
             Out::PermissionReply { id, allow } => json!({"type": "permission_reply", "id": id, "allow": allow}),
-            Out::Audio(pcm) => return Message::binary(pcm),
+            Out::Audio(pcm) => return Some(Message::binary(pcm)),
+            Out::Reconnect => return None,
         };
-        Message::text(v.to_string())
+        Some(Message::text(v.to_string()))
     }
 }
 
@@ -145,6 +151,7 @@ pub fn spawn(url: String, handle: AppHandle<State>, player: Player) -> Net {
     let events = move |e: Event| match e {
         Event::Connected(c) => handle.update(move |s, _| s.on_connected(c)),
         Event::Message(m) => handle.update(move |s, _| s.on_message(m)),
+        Event::Taken => handle.update(|s, _| s.on_taken()),
     };
     std::thread::Builder::new()
         .name("charlando-red".into())
@@ -159,6 +166,8 @@ pub fn spawn(url: String, handle: AppHandle<State>, player: Player) -> Net {
 pub enum Event {
     Connected(bool),
     Message(In),
+    /// El servidor cerró con 4001: no se reintenta hasta `Out::Reconnect`.
+    Taken,
 }
 
 /// El bucle de conexión, separado de Rune para poder probarlo.
@@ -173,6 +182,7 @@ pub async fn run(url: String, mut rx: mpsc::UnboundedReceiver<Out>, events: impl
                 while rx.try_recv().is_ok() {}
                 events(Event::Connected(true));
                 let (mut sink, mut stream) = ws.split();
+                let mut taken = false;
                 loop {
                     tokio::select! {
                         msg = stream.next() => match msg {
@@ -180,14 +190,30 @@ pub async fn run(url: String, mut rx: mpsc::UnboundedReceiver<Out>, events: impl
                                 if let Some(m) = parse(&t) { events(Event::Message(m)); }
                             }
                             Some(Ok(Message::Binary(b))) => audio(&b),
-                            Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                            Some(Ok(Message::Close(frame))) => {
+                                taken = frame.is_some_and(|f| u16::from(f.code) == CLOSE_TAKEN);
+                                break;
+                            }
+                            Some(Err(_)) | None => break,
                             Some(Ok(_)) => {}
                         },
                         out = rx.recv() => match out {
-                            Some(o) => if sink.send(o.into_message()).await.is_err() { break },
+                            Some(o) => if let Some(m) = o.into_message() && sink.send(m).await.is_err() { break },
                             None => return,
                         },
                     }
+                }
+                if taken {
+                    eprintln!("charlando: otro cliente se ha conectado; espero a «Usar aquí»");
+                    events(Event::Taken);
+                    loop {
+                        match rx.recv().await {
+                            Some(Out::Reconnect) => break,
+                            Some(_) => {}
+                            None => return,
+                        }
+                    }
+                    continue;
                 }
                 eprintln!("charlando: conexión perdida");
                 events(Event::Connected(false));
@@ -247,7 +273,7 @@ mod tests {
 
     #[test]
     fn messages_follow_the_protocol() {
-        let text = |o: Out| match o.into_message() {
+        let text = |o: Out| match o.into_message().unwrap() {
             Message::Text(t) => serde_json::from_str::<Value>(&t).unwrap(),
             _ => panic!(),
         };
@@ -269,6 +295,75 @@ mod tests {
         );
         assert_eq!(text(Out::PttStart), json!({"type":"ptt_start"}));
         assert_eq!(text(Out::PttEnd), json!({"type":"ptt_end"}));
+        assert_eq!(Out::Reconnect.into_message(), None, "no sale al servidor");
+    }
+
+    /// Un servidor que cierra cada conexión con `code`. Devuelve su URL y cuántas conexiones lleva.
+    async fn closing_server(code: u16) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("ws://{}/ws", listener.local_addr().unwrap());
+        let count = std::sync::Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        tokio::spawn(async move {
+            while let Ok((tcp, _)) = listener.accept().await {
+                c.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async move {
+                    let mut ws = tokio_tungstenite::accept_async(tcp).await.unwrap();
+                    let frame = CloseFrame { code: code.into(), reason: "otro cliente".into() };
+                    let _ = ws.close(Some(frame)).await;
+                    while ws.next().await.is_some() {}
+                });
+            }
+        });
+        (url, count)
+    }
+
+    /// El bucle de red contra `url`, en otra tarea. Sus avisos llegan por el receptor.
+    fn spawn_run(url: String) -> (mpsc::UnboundedSender<Out>, mpsc::UnboundedReceiver<String>) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (ev_tx, ev_rx) = mpsc::unbounded_channel();
+        let events = move |e: Event| {
+            let _ = ev_tx.send(match e {
+                Event::Connected(c) => format!("connected {c}"),
+                Event::Message(_) => "message".into(),
+                Event::Taken => "taken".into(),
+            });
+        };
+        tokio::spawn(run(url, rx, events, |_| {}));
+        (tx, ev_rx)
+    }
+
+    async fn next(ev: &mut mpsc::UnboundedReceiver<String>) -> String {
+        tokio::time::timeout(Duration::from_secs(5), ev.recv()).await.unwrap().unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_4001_close_waits_for_reconnect() {
+        use std::sync::atomic::Ordering;
+        let (url, count) = closing_server(CLOSE_TAKEN).await;
+        let (tx, mut ev) = spawn_run(url);
+        assert_eq!(next(&mut ev).await, "connected true");
+        assert_eq!(next(&mut ev).await, "taken");
+        tokio::time::sleep(RETRY + Duration::from_millis(500)).await;
+        assert!(ev.try_recv().is_err());
+        assert_eq!(count.load(Ordering::SeqCst), 1, "no reintenta solo");
+        tx.send(Out::PttStart).unwrap();
+        tx.send(Out::Reconnect).unwrap();
+        assert_eq!(next(&mut ev).await, "connected true", "«Usar aquí» vuelve a conectar al momento");
+        assert_eq!(count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn any_other_close_retries_every_2_s() {
+        use std::sync::atomic::Ordering;
+        let (url, count) = closing_server(1000).await;
+        let (_tx, mut ev) = spawn_run(url);
+        for e in ["connected true", "connected false", "connected true", "connected false"] {
+            assert_eq!(next(&mut ev).await, e);
+        }
+        assert_eq!(count.load(Ordering::SeqCst), 2);
     }
 
     /// Un turno entero contra el servidor de verdad, con el bucle de red y el estado de la app.
@@ -299,6 +394,7 @@ mod tests {
             if let Ok(e) = ev_rx.recv_timeout(Duration::from_millis(50)) {
                 match e {
                     Event::Connected(c) => s.on_connected(c),
+                    Event::Taken => s.on_taken(),
                     Event::Message(m) => {
                         eprintln!("← {m:?}");
                         let hello = matches!(m, In::Hello { .. });
