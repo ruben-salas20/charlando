@@ -1,0 +1,11 @@
+[Unit]
+Description=Charlando: servicio de voz (ASR y TTS con LFM3)
+
+[Service]
+# RUTA_DEL_REPO se sustituye al instalar (ver README).
+WorkingDirectory=RUTA_DEL_REPO/voz
+ExecStart=RUTA_DEL_REPO/voz/.venv/bin/python voz.py
+Environment=PYTHONUNBUFFERED=1
+# Si la IP de CHARLANDO_VOZ_HOST aún no existe (red privada arrancando), reintenta.
+Restart=on-failure
+RestartSec=5

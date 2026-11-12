@@ -3,6 +3,7 @@ package io.github.rubensalas.charlando
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -13,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -118,30 +120,37 @@ fun App(charla: Charla, onNeedMic: () -> Boolean) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Bar(s, onSettings = { charla.settingsOpen = true })
             when (s.screen) {
-                Screen.Start -> Inicio(s, onStart = { onNeedMic(); s.start() })
+                Screen.Start -> Inicio(s, onFolders = { charla.foldersOpen = true }, onStart = { onNeedMic(); s.start() })
                 Screen.Conversation -> Conversacion(s, onTap = { if (onNeedMic()) s.tap() })
             }
         }
+        Carpetas(s, charla.foldersOpen && s.screen == Screen.Start, onDismiss = { charla.foldersOpen = false })
         Ajustes(charla.settingsOpen, charla.url, onSave = charla::saveUrl, onDismiss = { charla.settingsOpen = false })
     }
 }
 
 @Composable
 private fun Bar(s: Estado, onSettings: () -> Unit) {
-    Box(
+    val conversation = s.screen == Screen.Conversation
+    // Dos lados con el mismo peso: el selector queda en el centro y el nombre se corta antes de llegar.
+    Row(
         Modifier.fillMaxWidth().height(52.dp).drawLine(bottom = true)
             .padding(start = 18.dp, end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(if (s.connected) Ok else Rec))
+        Row(Modifier.weight(1f).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (s.connected) Ok else if (s.taken) Fg3 else Rec))
             Spacer(Modifier.size(8.dp))
-            Text("Charlando", style = style(16.sp, FontWeight.SemiBold))
+            val name = if (conversation) s.current?.name ?: "Charlando" else "Charlando"
+            Text(name, style = style(16.sp, FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (s.screen == Screen.Conversation) {
-            Segmento(s, Modifier.align(Alignment.Center))
-            IconButton(R.drawable.ic_add, "Nueva conversación", Modifier.align(Alignment.CenterEnd)) { s.newConversation() }
+        if (conversation) {
+            Segmento(s, Modifier)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                IconButton(R.drawable.ic_add, "Nueva conversación", Modifier) { s.newConversation() }
+            }
         } else {
-            IconButton(R.drawable.ic_settings, "Ajustes", Modifier.align(Alignment.CenterEnd), onSettings)
+            IconButton(R.drawable.ic_settings, "Ajustes", Modifier, onSettings)
         }
     }
 }
@@ -178,14 +187,31 @@ private fun Segmento(s: Estado, modifier: Modifier) {
 }
 
 @Composable
-private fun Inicio(s: Estado, onStart: () -> Unit) {
+private fun Inicio(s: Estado, onFolders: () -> Unit, onStart: () -> Unit) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
     ) {
         Column {
             Text("Charlando", style = style(26.sp, FontWeight.SemiBold))
-            Text("Elige con quién hablar.", style = style(Body, color = Fg2), modifier = Modifier.padding(top = 4.dp))
+            Text("Elige dónde y con quién hablar.", style = style(Body, color = Fg2), modifier = Modifier.padding(top = 4.dp))
+        }
+        Column {
+            Text("Carpeta", style = style(12.sp, color = Fg3), modifier = Modifier.padding(bottom = 8.dp))
+            Row(
+                Modifier.fillMaxWidth().box(L1, RoundedCornerShape(12.dp)).tap(onClick = onFolders)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val f = s.folder
+                Column(Modifier.weight(1f)) {
+                    Text(f?.name ?: "Charla nueva", style = style(Body, FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    f?.let { Ruta(it.path) }
+                }
+                Text("▾", style = style(Body, color = Fg3))
+            }
+            s.error?.let { Text(it, style = style(13.sp, color = Rec), modifier = Modifier.padding(top = 8.dp)) }
         }
         Column {
             Text("Modelo", style = style(12.sp, color = Fg3), modifier = Modifier.padding(bottom = 8.dp))
@@ -223,15 +249,22 @@ private fun Inicio(s: Estado, onStart: () -> Unit) {
                 )
             }
         }
-        val ready = s.connected && !s.starting
-        BotonClaro("Empezar", enabled = ready, onClick = onStart)
+        if (s.taken) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(TAKEN_NOTE, style = style(13.sp, color = Fg2))
+                BotonClaro(USE_HERE, onClick = s::useHere)
+            }
+        } else {
+            val ready = s.connected && !s.starting
+            BotonClaro("Empezar", enabled = ready, onClick = onStart)
+        }
     }
 }
 
 @Composable
-private fun BotonClaro(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun BotonClaro(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().alpha(if (enabled) 1f else .5f).clip(RoundedCornerShape(14.dp))
+        modifier.fillMaxWidth().alpha(if (enabled) 1f else .5f).clip(RoundedCornerShape(14.dp))
             .background(Fg).tap(enabled = enabled, onClick = onClick).padding(14.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -239,32 +272,67 @@ private fun BotonClaro(label: String, enabled: Boolean = true, onClick: () -> Un
     }
 }
 
-/** Hoja de ajustes dibujada en la propia ventana: ModalBottomSheet abre otra y pinta clara la barra de navegación. */
+/** Una ruta en letra de código; si no cabe se ve el final, que es lo que distingue una carpeta. */
 @Composable
-private fun Ajustes(open: Boolean, url: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+private fun Ruta(path: String) {
+    Text(path, style = TextStyle(fontFamily = Mono, fontSize = 12.sp, color = Fg3), maxLines = 1, overflow = TextOverflow.StartEllipsis)
+}
+
+/** Hoja dibujada en la propia ventana: ModalBottomSheet abre otra y pinta clara la barra de navegación. */
+@Composable
+private fun Hoja(open: Boolean, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     BackHandler(enabled = open, onBack = onDismiss)
     AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .5f)).tap(role = Role.Button, onClick = onDismiss))
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(open, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
-            HojaAjustes(url, onSave)
+            val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            Column(
+                Modifier.fillMaxWidth().clip(shape).background(L1).border(1.dp, Line, shape)
+                    .tap(role = Role.Button) {}
+                    .navigationBarsPadding().imePadding()
+                    .padding(start = 22.dp, end = 22.dp, top = 14.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(Modifier.padding(bottom = 6.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(L3).align(Alignment.CenterHorizontally))
+                content()
+            }
         }
     }
 }
 
 @Composable
-private fun HojaAjustes(url: String, onSave: (String) -> Unit) {
-    var text by remember { mutableStateOf(url) }
-    val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+private fun Carpetas(s: Estado, open: Boolean, onDismiss: () -> Unit) {
+    Hoja(open, onDismiss) {
+        Text("Carpeta", style = style(17.sp, FontWeight.SemiBold))
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            for (f in s.folders) {
+                ItemCarpeta(f.name, f.path, on = s.folder == f) { s.chooseFolder(f); onDismiss() }
+            }
+            if (s.folders.isNotEmpty()) {
+                Box(Modifier.padding(vertical = 4.dp).fillMaxWidth().height(1.dp).background(Line))
+            }
+            ItemCarpeta("+ Charla nueva", s.charlas.takeIf { it.isNotEmpty() }?.let { "en $it" }, on = s.folder == null, color = Fg2) { s.chooseFolder(null); onDismiss() }
+        }
+    }
+}
+
+@Composable
+private fun ItemCarpeta(name: String, path: String?, on: Boolean, color: Color = Fg, onClick: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(L1).border(1.dp, Line, shape)
-            .tap(role = Role.Button) {}
-            .navigationBarsPadding().imePadding()
-            .padding(start = 22.dp, end = 22.dp, top = 14.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (on) L2 else Color.Transparent)
+            .tap(role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        Box(Modifier.padding(bottom = 6.dp).size(36.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(L3).align(Alignment.CenterHorizontally))
+        Text(name, style = style(Body, color = color), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        path?.let { Ruta(it) }
+    }
+}
+
+@Composable
+private fun Ajustes(open: Boolean, url: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    Hoja(open, onDismiss) {
+        var text by remember { mutableStateOf(url) }
         Text("Ajustes", style = style(17.sp, FontWeight.SemiBold))
         Column {
             Text("Servidor", style = style(12.sp, color = Fg3), modifier = Modifier.padding(bottom = 8.dp))
@@ -296,18 +364,24 @@ private fun HojaAjustes(url: String, onSave: (String) -> Unit) {
     }
 }
 
-private fun phaseLabel(s: Estado) = if (!s.connected) "Sin conexión. Reintentando…" else when (s.phase) {
+private const val TAKEN_NOTE = "Charlando está abierto en otro dispositivo."
+private const val TAKEN = "Abierto en otro dispositivo"
+private const val USE_HERE = "Usar aquí"
+
+private fun phaseLabel(s: Estado) = if (s.taken) TAKEN else if (!s.connected) "Sin conexión. Reintentando…" else when (s.phase) {
     Phase.Idle -> ""
     Phase.Recording -> "Grabando… toca para enviar"
     Phase.Thinking -> "Pensando…"
     Phase.Speaking -> "Claude habla…"
+    Phase.Permission -> "Esperando tu permiso"
 }
 
-private fun bigLabel(s: Estado) = if (!s.connected) "Sin conexión" else when (s.phase) {
+private fun bigLabel(s: Estado) = if (s.taken) TAKEN else if (!s.connected) "Sin conexión" else when (s.phase) {
     Phase.Idle -> "Toca la bola para hablar"
     Phase.Recording -> "Te escucho"
     Phase.Thinking -> "Pensando…"
     Phase.Speaking -> "Hablando"
+    Phase.Permission -> "Esperando tu permiso"
 }
 
 @Composable
@@ -371,6 +445,7 @@ private fun Chat(s: Estado, modifier: Modifier) {
                 Respuesta(m.text, streaming, style(Body, color = if (m.who == Who.You) Fg2 else Fg))
             }
         }
+        if (s.phase == Phase.Permission) s.permission?.let { Tarjeta(it, s::answer) }
         s.error?.let { Text("Error: $it", style = style(13.sp, color = Rec)) }
     }
     // La respuesta crece mientras suena: se sigue el final.
@@ -392,6 +467,7 @@ private fun Medidor(s: Estado, color: Color) {
 @Composable
 private fun Pie(s: Estado, onTap: () -> Unit) {
     val rec = s.phase == Phase.Recording
+    val perm = s.phase == Phase.Permission
     val busy = !s.connected || s.phase == Phase.Thinking || s.phase == Phase.Speaking
     Column(
         Modifier.fillMaxWidth().drawLine(bottom = false).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 22.dp),
@@ -400,10 +476,14 @@ private fun Pie(s: Estado, onTap: () -> Unit) {
     ) {
         val label = phaseLabel(s)
         if (label.isNotEmpty()) Text(label, style = style(13.sp, color = Fg2))
+        if (s.taken) {
+            BotonClaro(USE_HERE, onClick = s::useHere)
+            return@Column
+        }
         val shape = RoundedCornerShape(30.dp)
         val fg = if (rec) Color.White else Fg
         Row(
-            Modifier.fillMaxWidth().height(60.dp).alpha(if (busy) .45f else 1f)
+            Modifier.fillMaxWidth().height(60.dp).alpha(if (perm) .35f else if (busy) .45f else 1f)
                 .box(if (rec) Rec else L2, shape, if (rec) Color.Transparent else Line)
                 .tap(enabled = s.canTalk() || rec, onClick = onTap),
             horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
@@ -433,6 +513,8 @@ private fun Modifier.fadeTop(top: Dp) = graphicsLayer(compositingStrategy = Comp
 @Composable
 private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
     val showReply = s.phase == Phase.Speaking || s.phase == Phase.Idle
+    val card = s.permission.takeIf { s.phase == Phase.Permission }
+    val orb by animateDpAsState(if (card != null) 130.dp else 220.dp, label = "bola")
     val line = with(LocalDensity.current) { (14.sp * 1.45f).toDp() }
     val replyMax = line * REPLY_LINES + ReplyFade
     Column(
@@ -442,10 +524,18 @@ private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
     ) {
         Bola(
             s.phase, s.connected, s.level,
-            Modifier.size(220.dp).clip(CircleShape)
+            Modifier.size(orb).clip(CircleShape)
                 .tap(enabled = s.canTalk() || s.phase == Phase.Recording, onClick = onTap),
         )
         Text(bigLabel(s), style = style(19.sp, FontWeight.SemiBold), textAlign = TextAlign.Center)
+        if (card != null) {
+            Tarjeta(card, s::answer)
+            return@Column
+        }
+        if (s.taken) {
+            BotonClaro(USE_HERE, Modifier.widthIn(max = 300.dp), onClick = s::useHere)
+            return@Column
+        }
         // Alto fijo para que la bola no se mueva con el texto.
         Column(
             Modifier.widthIn(max = 300.dp).height(line * QUESTION_LINES + VoiceGap + replyMax),
@@ -471,5 +561,35 @@ private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
             }
             LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
         }
+    }
+}
+
+/** La tarjeta de permiso: solo se responde con el dedo (PROTOCOLO.md). */
+@Composable
+private fun Tarjeta(p: In.Permission, onAnswer: (Boolean) -> Unit) {
+    Column(Modifier.fillMaxWidth().box(L1, RoundedCornerShape(14.dp), Accent).padding(14.dp)) {
+        Text("Claude necesita tu permiso", style = style(Body, FontWeight.SemiBold), modifier = Modifier.padding(bottom = 2.dp))
+        Text(toolLabel(p.tool), style = style(13.sp, color = Fg3), modifier = Modifier.padding(bottom = 10.dp))
+        // Un JSON largo no debe empujar los botones fuera de la pantalla.
+        Text(
+            p.detail,
+            style = TextStyle(fontFamily = Mono, fontSize = 13.sp, color = Fg, lineHeight = 1.45.em),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).box(Color(0xFF0F0F0F), RoundedCornerShape(8.dp))
+                .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            BotonTarjeta("Rechazar", L3, Fg, Modifier.weight(1f)) { onAnswer(false) }
+            BotonTarjeta("Aceptar", Fg, Bg, Modifier.weight(1f)) { onAnswer(true) }
+        }
+    }
+}
+
+@Composable
+private fun BotonTarjeta(label: String, fill: Color, fg: Color, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.clip(RoundedCornerShape(12.dp)).background(fill).tap(onClick = onClick).padding(vertical = 13.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = style(Body, FontWeight.SemiBold, fg))
     }
 }

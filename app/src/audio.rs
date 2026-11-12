@@ -239,6 +239,13 @@ impl Audio {
         Audio { mic: Mic::default(), player: Player::new(false, REPLY_RATE) }
     }
 
+    /// Sin dispositivos, pero el audio que llega se queda en cola: para probar lo que espera a
+    /// que termine de sonar.
+    #[cfg(test)]
+    pub fn queued() -> Audio {
+        Audio { mic: Mic::default(), player: Player::new(true, REPLY_RATE) }
+    }
+
     /// Abre el micrófono y la salida por defecto. Los streams de cpal no son `Send`, así que
     /// viven en un hilo propio que no termina nunca.
     pub fn start() -> Audio {
