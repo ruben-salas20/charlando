@@ -1,5 +1,5 @@
 // El WebSocket con el servidor. OkHttp lo lleva en sus propios hilos; aquí solo se reintenta
-// cada 2 s mientras no hay conexión (PROTOCOLO.md).
+// cada 2 s mientras no hay conexión, salvo si otro cliente se quedó el cerebro (PROTOCOLO.md).
 package io.github.rubensalas.charlando
 
 import android.util.Log
@@ -15,10 +15,12 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 private const val RETRY_MS = 2_000L
+private const val CLOSE_OTHER_CLIENT = 4001
 private const val TAG = "charlando"
 
 class Red(
     private val onConnected: (Boolean) -> Unit,
+    private val onTaken: () -> Unit,
     private val onMessage: (In) -> Unit,
     private val onAudio: (ByteArray) -> Unit,
 ) : Sender {
@@ -30,6 +32,8 @@ class Red(
     private var url = ""
     private var socket: WebSocket? = null
     private var open = false
+    /** Cerró con 4001: no se reintenta hasta `reconnect`. */
+    private var taken = false
     /** Cada conexión nueva invalida los avisos que lleguen tarde de la anterior. */
     private var generation = 0
     private var retry: ScheduledFuture<*>? = null
@@ -40,14 +44,24 @@ class Red(
         val wasOpen: Boolean
         synchronized(lock) {
             url = newUrl.trim()
-            wasOpen = open
+            wasOpen = open || taken
             open = false
+            taken = false
             generation++
             retry?.cancel(false)
             socket?.cancel()
             socket = null
         }
         if (wasOpen) onConnected(false)
+        timer.execute { attempt() }
+    }
+
+    /** Tras un cierre 4001, vuelve a intentarlo como siempre. */
+    fun reconnect() {
+        synchronized(lock) {
+            if (!taken) return
+            taken = false
+        }
         timer.execute { attempt() }
     }
 
@@ -108,6 +122,19 @@ class Red(
         if (wasOpen) onConnected(false)
     }
 
+    private fun takenBy(gen: Int) {
+        synchronized(lock) {
+            if (gen != generation) return
+            open = false
+            taken = true
+            socket = null
+            generation++
+        }
+        lastError = ""
+        Log.i(TAG, "otro cliente se quedó la conexión; no se reintenta")
+        onTaken()
+    }
+
     private inner class Listener(private val gen: Int) : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             synchronized(lock) {
@@ -131,7 +158,7 @@ class Red(
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             webSocket.close(1000, null)
-            fail(gen, "el servidor cerró ($code)")
+            if (code == CLOSE_OTHER_CLIENT) takenBy(gen) else fail(gen, "el servidor cerró ($code)")
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {

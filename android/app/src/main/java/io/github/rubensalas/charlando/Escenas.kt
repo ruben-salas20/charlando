@@ -13,9 +13,9 @@ private val FOLDERS = listOf(
 private val PERMISSION = In.Permission("p1", "Bash", "git push origin main")
 
 /**
- * Escenas: `inicio`, `inicio-desconectado`, `inicio-carpetas` (con recientes), `inicio-hoja` (hoja de
- * carpetas abierta), `inicio-falta` (carpeta borrada), y `chat-` o `voz-` con `espera`, `grabando`,
- * `pensando`, `hablando`, `larga`, `desconectado` o `permiso`.
+ * Escenas: `inicio`, `inicio-desconectado`, `inicio-otro` (abierto en otro dispositivo), `inicio-carpetas`
+ * (con recientes), `inicio-hoja` (hoja de carpetas abierta), `inicio-falta` (carpeta borrada), y `chat-` o
+ * `voz-` con `espera`, `grabando`, `pensando`, `hablando`, `larga`, `desconectado`, `otro` o `permiso`.
  */
 fun escena(charla: Charla, name: String) {
     val s = charla.estado
@@ -23,7 +23,8 @@ fun escena(charla: Charla, name: String) {
     charla.settingsOpen = false
     val parts = name.split("-")
     if (parts[0] == "inicio") {
-        s.connected = parts.getOrNull(1) != "desconectado"
+        s.connected = parts.getOrNull(1) !in listOf("desconectado", "otro")
+        s.taken = parts.getOrNull(1) == "otro"
         if (parts.getOrNull(1) in listOf("carpetas", "hoja", "falta")) s.onMessage(In.Hello(FOLDERS, "~/charlando"))
         charla.foldersOpen = parts.getOrNull(1) == "hoja"
         if (parts.getOrNull(1) == "falta") s.onMessage(In.FolderMissing("La carpeta ~/proyectos/mi-proyecto ya no existe."))
@@ -37,7 +38,8 @@ fun escena(charla: Charla, name: String) {
         "permiso" -> Phase.Permission
         else -> Phase.Idle
     }
-    s.connected = parts.getOrNull(1) != "desconectado"
+    s.connected = parts.getOrNull(1) !in listOf("desconectado", "otro")
+    s.taken = parts.getOrNull(1) == "otro"
     s.screen = Screen.Conversation
     s.current = FOLDERS[0]
     s.permission = if (phase == Phase.Permission) PERMISSION else null

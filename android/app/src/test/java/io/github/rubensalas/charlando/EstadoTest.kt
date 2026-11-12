@@ -29,9 +29,10 @@ class EstadoTest {
     private val store = MemoryStore()
 
     private val proyecto = Folder("/p/proyecto", "proyecto")
+    private var reconnects = 0
 
     private fun connected(): Estado {
-        val s = Estado({ sent.add(it) }, NullMic(), player, store)
+        val s = Estado({ sent.add(it) }, NullMic(), player, store, reconnect = { reconnects++ })
         s.onConnected(true)
         s.onMessage(In.Hello(listOf(proyecto), "/charlas"))
         s.start()
@@ -354,6 +355,99 @@ class EstadoTest {
         s.onConnected(true)
         s.tick(0.0)
         assertTrue(s.phase != Phase.Permission)
+    }
+
+    @Test
+    fun anotherClientTakesTheConnectionAndTheConversationStays() {
+        val s = connected()
+        s.tap()
+        s.tap()
+        s.onMessage(In.Transcript("Hola"))
+        s.onMessage(In.State("speaking"))
+        s.onMessage(In.Sentence("Hola, ¿qué tal?"))
+        player.empty = false
+        s.onTaken()
+        assertTrue(s.taken)
+        assertTrue(!s.connected)
+        assertEquals(Screen.Conversation, s.screen)
+        assertEquals("se pierde el turno en curso", Phase.Idle, s.phase)
+        assertTrue("se vacía el audio en cola", player.isEmpty())
+        assertEquals("la conversación sigue ahí", 2, s.messages.size)
+        assertEquals(0, reconnects)
+    }
+
+    @Test
+    fun whileTakenTalkingAndStartingDoNothing() {
+        val s = connected()
+        s.onTaken()
+        val before = sent.size
+        s.tap()
+        s.pttDown()
+        assertEquals(Phase.Idle, s.phase)
+        s.newConversation()
+        s.start()
+        assertEquals(before, sent.size)
+        assertTrue("«+» no cambia el estado de la conexión", s.taken)
+    }
+
+    @Test
+    fun theCardIsLostWhenAnotherClientTakesTheConnection() {
+        val s = connected()
+        askPermission(s)
+        s.tick(0.0)
+        assertEquals(Phase.Permission, s.phase)
+        s.onTaken()
+        assertEquals(Phase.Idle, s.phase)
+        assertNull(s.permission)
+        s.answer(true)
+        assertTrue(sent.none { it is Out.PermissionReply })
+    }
+
+    @Test
+    fun useHereReconnectsAndResumesTheConversation() {
+        val s = connected()
+        s.tap()
+        s.tap()
+        s.onMessage(In.Transcript("Hola"))
+        s.onMessage(In.State("speaking"))
+        s.onMessage(In.Sentence("Hola, ¿qué tal?"))
+        s.onMessage(In.ReplyEnd)
+        s.tick(0.0)
+        s.onTaken()
+        s.useHere()
+        assertEquals(1, reconnects)
+        assertTrue(!s.taken)
+        s.useHere()
+        assertEquals("solo pide reconectar una vez", 1, reconnects)
+        s.onConnected(true)
+        assertEquals(Out.Start("/p/proyecto", "haiku", false, "s1"), sent.last())
+        assertTrue("no se habla hasta que llegue ready", !s.canTalk())
+        s.onMessage(In.Ready("s1", proyecto))
+        assertTrue(s.canTalk())
+        assertEquals(2, s.messages.size)
+    }
+
+    @Test
+    fun useHereOnTheStartScreenLetsYouStart() {
+        val s = Estado({ sent.add(it) }, NullMic(), player, store, reconnect = { reconnects++ })
+        s.onConnected(true)
+        s.onTaken()
+        s.start()
+        assertTrue(sent.isEmpty())
+        s.useHere()
+        s.onConnected(true)
+        assertTrue("en el inicio no se envía nada al conectar", sent.isEmpty())
+        s.start()
+        assertEquals(Out.Start(null, "haiku", false), sent.last())
+    }
+
+    @Test
+    fun useHereDoesNothingWhenNotTaken() {
+        val s = connected()
+        s.useHere()
+        s.onConnected(false)
+        s.useHere()
+        assertEquals(0, reconnects)
     }
 
     @Test
