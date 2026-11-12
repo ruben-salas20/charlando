@@ -53,8 +53,8 @@ sealed interface Out {
 
 /** Del servidor a la app (los mensajes de texto; el audio va directo al reproductor). */
 sealed interface In {
-    /** Las carpetas recientes, la más reciente primero. */
-    data class Hello(val folders: List<Folder>) : In
+    /** Las carpetas recientes, la más reciente primero. `charlas`: dónde crea «Charla nueva» sus carpetas. */
+    data class Hello(val folders: List<Folder>, val charlas: String) : In
     /** `session`: el id de la conversación, para reanudarla. `folder`: dónde trabaja Claude. */
     data class Ready(val session: String, val folder: Folder) : In
     data class State(val state: String) : In
@@ -81,6 +81,7 @@ fun parse(text: String): In? {
                 .mapNotNull { it as? JsonObject }
                 .map { Folder(it.str("path"), it.str("name")) }
                 .filter { it.path.isNotEmpty() },
+            s("charlas"),
         )
         "ready" -> In.Ready(s("session"), Folder(s("folder"), s("name")))
         "state" -> In.State(s("state"))

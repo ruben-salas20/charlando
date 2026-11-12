@@ -24,7 +24,7 @@ fun escena(charla: Charla, name: String) {
     val parts = name.split("-")
     if (parts[0] == "inicio") {
         s.connected = parts.getOrNull(1) != "desconectado"
-        if (parts.getOrNull(1) in listOf("carpetas", "hoja", "falta")) s.onMessage(In.Hello(FOLDERS))
+        if (parts.getOrNull(1) in listOf("carpetas", "hoja", "falta")) s.onMessage(In.Hello(FOLDERS, "~/charlando"))
         charla.foldersOpen = parts.getOrNull(1) == "hoja"
         if (parts.getOrNull(1) == "falta") s.onMessage(In.FolderMissing("La carpeta ~/proyectos/mi-proyecto ya no existe."))
         return

@@ -33,7 +33,7 @@ class EstadoTest {
     private fun connected(): Estado {
         val s = Estado({ sent.add(it) }, NullMic(), player, store)
         s.onConnected(true)
-        s.onMessage(In.Hello(listOf(proyecto)))
+        s.onMessage(In.Hello(listOf(proyecto), "/charlas"))
         s.start()
         s.onMessage(In.Ready("s1", proyecto))
         return s
@@ -219,9 +219,9 @@ class EstadoTest {
     fun theMostRecentFolderIsChosenAndAnEmptyListMeansANewChat() {
         val s = Estado({ sent.add(it) }, NullMic(), player, store)
         s.onConnected(true)
-        s.onMessage(In.Hello(emptyList()))
+        s.onMessage(In.Hello(emptyList(), "/charlas"))
         assertNull("lista vacía: «Charla nueva»", s.folder)
-        s.onMessage(In.Hello(listOf(proyecto, Folder("/p/notas", "notas"))))
+        s.onMessage(In.Hello(listOf(proyecto, Folder("/p/notas", "notas")), "/charlas"))
         assertEquals(proyecto, s.folder)
         s.start()
         assertEquals(Out.Start("/p/proyecto", "haiku", false), sent.last())
@@ -232,11 +232,11 @@ class EstadoTest {
         val notas = Folder("/p/notas", "notas")
         val s = Estado({ sent.add(it) }, NullMic(), player, store)
         s.onConnected(true)
-        s.onMessage(In.Hello(listOf(proyecto, notas)))
+        s.onMessage(In.Hello(listOf(proyecto, notas), "/charlas"))
         s.chooseFolder(notas)
         s.onConnected(false)
         s.onConnected(true)
-        s.onMessage(In.Hello(listOf(proyecto, notas)))
+        s.onMessage(In.Hello(listOf(proyecto, notas), "/charlas"))
         assertEquals(notas, s.folder)
         s.chooseFolder(null)
         s.start()
@@ -248,7 +248,7 @@ class EstadoTest {
         val creada = Folder("/charlas/2026-11-12", "2026-11-12")
         val s = Estado({ sent.add(it) }, NullMic(), player, store)
         s.onConnected(true)
-        s.onMessage(In.Hello(emptyList()))
+        s.onMessage(In.Hello(emptyList(), "/charlas"))
         s.start()
         assertEquals(Out.Start(null, "haiku", false), sent.last())
         s.onMessage(In.Ready("s1", creada))
@@ -263,7 +263,7 @@ class EstadoTest {
     fun aMissingFolderGoesBackToStartWithTheMessage() {
         val s = Estado({ sent.add(it) }, NullMic(), player, store)
         s.onConnected(true)
-        s.onMessage(In.Hello(listOf(proyecto)))
+        s.onMessage(In.Hello(listOf(proyecto), "/charlas"))
         s.start()
         s.onMessage(In.FolderMissing("La carpeta no existe"))
         assertEquals(Screen.Start, s.screen)
@@ -358,6 +358,28 @@ class EstadoTest {
     }
 
     @Test
+    fun aHelloAfterReadyUpdatesTheListAndWhereNewChatsGo() {
+        val s = connected()
+        assertEquals("/charlas", s.charlas)
+        val notas = Folder("/p/notas", "notas")
+        s.onMessage(In.Hello(listOf(notas, proyecto), "/otras"))
+        assertEquals(listOf(notas, proyecto), s.folders.toList())
+        assertEquals("/otras", s.charlas)
+        assertEquals("la conversación sigue", Screen.Conversation, s.screen)
+        assertEquals(proyecto, s.current)
+    }
+
+    @Test
+    fun theCardSaysWhatClaudeWantsToDo() {
+        assertEquals("Ejecutar un comando", toolLabel("Bash"))
+        for (t in listOf("Write", "Edit", "NotebookEdit")) assertEquals("Escribir un archivo", toolLabel(t))
+        assertEquals("Lanzar un subagente", toolLabel("Task"))
+        assertEquals("Lanzar un subagente", toolLabel("Agent"))
+        assertEquals("Usar un conector", toolLabel("mcp__github__create_issue"))
+        assertEquals("Usar WebSearch", toolLabel("WebSearch"))
+    }
+
+    @Test
     fun theBarShowsTheFolderFromReady() {
         val s = connected()
         assertEquals("proyecto", s.current?.name)
@@ -370,10 +392,10 @@ class ProtocoloTest {
     @Test
     fun parsesEveryServerMessage() {
         assertEquals(
-            In.Hello(listOf(Folder("/p/a", "a"), Folder("/p/b", "b"))),
-            parse("""{"type":"hello","folders":[{"path":"/p/a","name":"a"},{"path":"/p/b","name":"b"}]}"""),
+            In.Hello(listOf(Folder("/p/a", "a"), Folder("/p/b", "b")), "/charlas"),
+            parse("""{"type":"hello","folders":[{"path":"/p/a","name":"a"},{"path":"/p/b","name":"b"}],"charlas":"/charlas"}"""),
         )
-        assertEquals(In.Hello(emptyList()), parse("""{"type":"hello","folders":[]}"""))
+        assertEquals(In.Hello(emptyList(), "/charlas"), parse("""{"type":"hello","folders":[],"charlas":"/charlas"}"""))
         assertEquals(
             In.Ready("s1", Folder("/p/a", "a")),
             parse("""{"type":"ready","model":"haiku","session":"s1","folder":"/p/a","name":"a"}"""),

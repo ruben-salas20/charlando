@@ -68,6 +68,9 @@ class Estado(
     /** La carpeta elegida en el inicio; nula es «Charla nueva». */
     var folder by mutableStateOf<Folder?>(null)
         private set
+    /** Dónde crea el cerebro las carpetas de «Charla nueva». */
+    var charlas by mutableStateOf("")
+        private set
     /** La persona eligió carpeta: un `hello` nuevo ya no la cambia. */
     private var folderChosen = false
     /** La carpeta de la conversación abierta, la del último `ready`. */
@@ -201,6 +204,7 @@ class Estado(
             is In.Hello -> {
                 folders.clear()
                 folders.addAll(msg.folders)
+                charlas = msg.charlas
                 if (!folderChosen) folder = msg.folders.firstOrNull()
             }
             is In.Ready -> if (resuming) {
@@ -294,6 +298,15 @@ class Estado(
 
     /** La respuesta que va con la última pregunta (o la última si no hubo pregunta). */
     fun lastReply(): String? = messages.lastOrNull()?.takeIf { it.who == Who.Claude }?.text
+}
+
+/** Lo que quiere hacer Claude, bajo el título de la tarjeta de permiso. */
+fun toolLabel(tool: String) = when {
+    tool == "Bash" -> "Ejecutar un comando"
+    tool in setOf("Write", "Edit", "NotebookEdit") -> "Escribir un archivo"
+    tool == "Task" || tool == "Agent" -> "Lanzar un subagente"
+    tool.startsWith("mcp__") -> "Usar un conector"
+    else -> "Usar $tool"
 }
 
 /** La función `level()` de la maqueta, con `t` en segundos. */

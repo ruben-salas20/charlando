@@ -306,7 +306,7 @@ private fun Carpetas(s: Estado, open: Boolean, onDismiss: () -> Unit) {
             if (s.folders.isNotEmpty()) {
                 Box(Modifier.padding(vertical = 4.dp).fillMaxWidth().height(1.dp).background(Line))
             }
-            ItemCarpeta("+ Charla nueva", null, on = s.folder == null, color = Fg2) { s.chooseFolder(null); onDismiss() }
+            ItemCarpeta("+ Charla nueva", s.charlas.takeIf { it.isNotEmpty() }?.let { "en $it" }, on = s.folder == null, color = Fg2) { s.chooseFolder(null); onDismiss() }
         }
     }
 }
@@ -543,12 +543,6 @@ private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
             LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
         }
     }
-}
-
-private fun toolLabel(tool: String) = when (tool) {
-    "Bash" -> "Ejecutar un comando"
-    "Write", "Edit", "NotebookEdit" -> "Escribir un archivo"
-    else -> "Usar $tool"
 }
 
 /** La tarjeta de permiso: solo se responde con el dedo (PROTOCOLO.md). */
