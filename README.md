@@ -35,7 +35,7 @@ Los contratos entre las piezas están en [PROTOCOLO.md](PROTOCOLO.md) (app ↔ c
 
 ### Claude en tu carpeta
 
-Claude trabaja como en una sesión normal de Claude Code: carga tus ajustes, el `CLAUDE.md` de la carpeta, tus memorias y tus servidores MCP. Mientras usa una herramienta dice «Déjame mirarlo».
+Claude trabaja como en una sesión normal de Claude Code: carga tus ajustes, el `CLAUDE.md` de la carpeta, tus memorias y tus servidores MCP. Antes de usar una herramienta, Claude dice con sus palabras qué va a hacer. Si calla y la herramienta tarda más de 3 segundos, el cerebro dice «Dame un momento», como mucho una vez por respuesta.
 
 | Acción | Permiso |
 |---|---|
@@ -169,6 +169,7 @@ Cada pieza lee su `.env`, con todas las variables explicadas en su `.env.example
 | `CHARLANDO_VOZ_URL` | Cerebro | `ws://127.0.0.1:8766/voz` | Dónde está la voz |
 | `CHARLANDO_CHARLAS` | Cerebro | `~/charlando` | Dónde crea «Charla nueva» sus carpetas |
 | `CHARLANDO_ESPERA_PERMISO` | Cerebro | `60` | Segundos antes de repetir el aviso de permiso |
+| `CHARLANDO_ESPERA_AVISO` | Cerebro | `3` | Segundos de silencio con herramientas antes de decir «Dame un momento» |
 | `CHARLANDO_VOZ_HOST`, `CHARLANDO_VOZ_PORT` | Voz | `127.0.0.1`, `8766` | Dónde escucha al cerebro |
 | `CHARLANDO_MODELO` | Voz | `LiquidAI/LFM3-Audio-2B` | Id de Hugging Face o carpeta local |
 | `CHARLANDO_INACTIVIDAD` | Voz | `180` | Segundos sin uso antes de descargar el modelo |

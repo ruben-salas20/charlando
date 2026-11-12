@@ -43,7 +43,7 @@ El botón «+» vuelve a la pantalla de inicio en la app. El cerebro no se enter
 | `{"type":"state","state":"thinking"}` | Tras `ptt_end`: transcribe y espera a Claude |
 | `{"type":"transcript","text":"..."}` | Lo que entendió el ASR. Va en la burbuja «Tú» |
 | `{"type":"state","state":"speaking"}` | Justo antes del primer audio de la respuesta |
-| `{"type":"state","state":"thinking"}` (otra vez) | Claude va a usar una herramienta. Antes llega la frase «Déjame mirarlo.» con su audio. Después vuelve `speaking` y siguen las frases |
+| `{"type":"state","state":"thinking"}` (otra vez) | Claude va a usar una herramienta. Lo normal es que antes Claude diga qué va a hacer, con sus palabras. Si no dice nada y pasan `CHARLANDO_ESPERA_AVISO` segundos (3 por defecto), el cerebro envía la frase «Dame un momento.» con su audio y vuelve a enviar `thinking`; como mucho una vez por turno. Después vuelve `speaking` y siguen las frases |
 | `{"type":"permission","id":"<id>","tool":"Bash","detail":"git push origin main"}` | Claude necesita permiso para una herramienta. `detail` es lo que la app muestra tal cual: el comando completo, la ruta del archivo o, para otras herramientas, su entrada en JSON. Antes llega la frase «Necesito tu permiso. Míralo en pantalla.» con su audio |
 | `{"type":"sentence","text":"..."}` | Una frase de la respuesta. Se envía **justo antes** de su audio. La app la va añadiendo a la burbuja «Claude» |
 | binario, **24 kHz** | Audio de la respuesta, en trozos de cualquier tamaño, en orden |

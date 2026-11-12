@@ -25,6 +25,8 @@ VOZ_URL = os.environ.get("CHARLANDO_VOZ_URL", "ws://127.0.0.1:8766/voz")
 CHARLAS = os.path.abspath(os.path.expanduser(os.environ.get("CHARLANDO_CHARLAS", "~/charlando")))
 DEPURAR = os.environ.get("CHARLANDO_DEPURAR") == "1"
 ESPERA_PERMISO = float(os.environ.get("CHARLANDO_ESPERA_PERMISO", 60))
+# Si Claude usa herramientas sin decir nada, el aviso de reserva solo suena pasado este tiempo.
+ESPERA_AVISO = float(os.environ.get("CHARLANDO_ESPERA_AVISO", 3))
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "charlando")
 RECIENTES = os.path.join(CONFIG, "recientes.json")
 MAX_RECIENTES = 8
@@ -36,7 +38,9 @@ REGLAS_VOZ = ("Hablas con la persona por voz, en español: tus respuestas se lee
               "Sin markdown, sin listas, sin tablas, sin bloques de código y sin emojis. "
               "No leas en voz alta rutas largas, URLs, comandos ni código: si algo necesita verse, "
               "déjalo en un archivo de la carpeta de trabajo y di cómo se llama. "
-              "Antes de usar una herramienta no anuncies nada: el sistema ya avisa en voz alta. "
+              "Antes de usar herramientas, di en una frase corta y concreta qué vas a hacer, "
+              "por ejemplo «Miro tus notas.» o «Lo apunto en el diario.». Dilo una sola vez aunque "
+              "uses varias herramientas seguidas, y no repitas la misma fórmula en cada turno. "
               "Cuando una herramienta necesita permiso, la persona lo acepta o lo rechaza en pantalla: "
               "no le pidas que lo diga. "
               "Al contar lo que encontraste, resume con tus palabras. No añadas lista de fuentes ni enlaces.")
@@ -44,7 +48,7 @@ REGLAS_VOZ = ("Hablas con la persona por voz, en español: tus respuestas se lee
 DESACTIVADAS = ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"]
 LIBRES = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "TodoWrite"}
 ESCRITURA = {"Write": "file_path", "Edit": "file_path", "NotebookEdit": "notebook_path"}
-AVISO_HERRAMIENTA = "Déjame mirarlo."
+AVISO_HERRAMIENTA = "Dame un momento."
 AVISO_PERMISO = "Necesito tu permiso. Míralo en pantalla."
 RECORDATORIO_PERMISO = "Sigo esperando tu permiso. Míralo en pantalla."
 FIN_FRASE = ".?!:;\n"
@@ -349,6 +353,8 @@ class Sesion:
         self.permiso = None
         self.turno_permisos = asyncio.Lock()
         self.vistas = set()  # tool_use ya avisados en la cola
+        self.aviso = None  # tarea del aviso de reserva, si Claude calla mientras usa herramientas
+        self.avisado = False  # el aviso de reserva suena como mucho una vez por turno
         self.vista = asyncio.Event()
         self.t_fin = self.t_audio = None
 
@@ -439,7 +445,9 @@ class Sesion:
             return PermissionResultDeny(message="No se pudo pedir el permiso.", interrupt=True)
 
     async def pedir_permiso(self, herramienta, entrada, contexto):
-        # El aviso «Déjame mirarlo.» de esta herramienta tiene que ir antes que la tarjeta.
+        # El aviso de permiso sustituye al de reserva, y la tarjeta va después de lo ya dicho.
+        self.cancelar_aviso()
+        self.avisado = True
         id_uso = contexto.tool_use_id
         try:
             await asyncio.wait_for(self._esperar_vista(id_uso), 1)
@@ -473,6 +481,25 @@ class Sesion:
         while id_uso not in self.vistas:
             self.vista.clear()
             await self.vista.wait()
+
+    def programar_aviso(self):
+        if self.avisado or self.aviso is not None:
+            return
+
+        async def esperar():
+            await asyncio.sleep(ESPERA_AVISO)
+            self.aviso = None
+            if self.cola is not None and not self.avisado:
+                self.avisado = True
+                self.decir_ya(AVISO_HERRAMIENTA)
+                self.cola.put_nowait(PENSAR)
+
+        self.aviso = asyncio.create_task(esperar())
+
+    def cancelar_aviso(self):
+        if self.aviso is not None:
+            self.aviso.cancel()
+            self.aviso = None
 
     def decir_ya(self, texto, recordatorio=False):
         """Pide el audio a la voz ahora, para que se sintetice mientras suena lo anterior."""
@@ -528,10 +555,11 @@ class Sesion:
     async def responder(self, texto):
         self.cola = asyncio.Queue()
         self.vistas.clear()
+        self.avisado = False
         locutor = asyncio.create_task(self.locutor())
         pendiente = ""
         primera = True
-        en_herramientas = False  # varias herramientas seguidas llevan un solo aviso
+        en_herramientas = False  # varias herramientas seguidas pasan una sola vez a thinking
         callar = False  # tras «Fuentes:» solo vienen enlaces: no se dicen
 
         def decir(frase):
@@ -562,7 +590,7 @@ class Sesion:
                         decir(pendiente)
                         pendiente = ""
                     elif not en_herramientas:
-                        self.decir_ya(AVISO_HERRAMIENTA)
+                        self.programar_aviso()
                     if not en_herramientas:
                         self.cola.put_nowait(PENSAR)
                     en_herramientas = True
@@ -571,6 +599,7 @@ class Sesion:
                     continue
                 if ev.get("type") == "content_block_delta" and ev["delta"].get("type") == "text_delta":
                     en_herramientas = False
+                    self.cancelar_aviso()
                     pendiente += ev["delta"]["text"]
                     frases, pendiente = cortar(pendiente)
                     for frase in frases:
@@ -583,6 +612,7 @@ class Sesion:
             locutor.cancel()
             raise
         finally:
+            self.cancelar_aviso()
             self.cola = None
 
     async def ejecutar_turno(self, futuro_asr):
