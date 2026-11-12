@@ -75,7 +75,14 @@ pub fn view(s: &State, _: &mut Cx<State>) -> El {
 }
 
 fn title_bar(s: &State, p: &Pal) -> El {
-    let dot = el().key("dot").size(7.0, 7.0).radius(3.5).fill(if s.connected { p.ok } else { p.rec });
+    let dot_color = if s.connected {
+        p.ok
+    } else if s.taken {
+        p.fg3
+    } else {
+        p.rec
+    };
+    let dot = el().key("dot").size(7.0, 7.0).radius(3.5).fill(dot_color);
     let here = s.folder.as_ref().filter(|_| s.screen == Screen::Conversation);
     let label = here.map_or("Charlando".to_owned(), |f| f.name.clone());
     let mut name = row()
@@ -230,21 +237,15 @@ fn start(s: &State, p: &Pal) -> El {
                 .child(text("Claude piensa cuando lo necesita. Más lento.").font(style(12.5, 400.0)).color(p.fg3)),
         )
         .child(switch);
-    let ready = s.connected && !s.starting && s.place.is_some();
-    let go = row()
-        .key("empezar")
-        .role("button")
-        .label("Empezar")
-        .w_full()
-        .py(10.0)
-        .center()
-        .radius(8.0)
-        .fill(c("#ededed"))
-        .hover(if ready { Color::WHITE } else { Color::TRANSPARENT })
-        .opacity(if ready { 1.0 } else { 0.5 })
-        .cursor(if ready { Cursor::Pointer } else { Cursor::Default })
-        .on_press(|s: &mut State| s.start())
-        .child(text("Empezar").font(style(BODY, 600.0)).color(c("#141414")));
+    let go = if s.taken {
+        col()
+            .gap(10.0)
+            .child(text(TAKEN_START).key("otro").font(style(13.0, 400.0)).color(p.fg2).wrap())
+            .child(use_here().w_full().py(10.0))
+    } else {
+        let ready = s.connected && !s.starting && s.place.is_some();
+        light_button("empezar", "Empezar", ready).w_full().py(10.0).on_press(|s: &mut State| s.start())
+    };
     col()
         .key("inicio")
         .w_full()
@@ -258,6 +259,28 @@ fn start(s: &State, p: &Pal) -> El {
         .child(models)
         .child(thinking)
         .child(go)
+}
+
+const TAKEN_START: &str = "Charlando está abierto en otro dispositivo.";
+const TAKEN: &str = "Abierto en otro dispositivo";
+
+/// El estilo de «Empezar».
+fn light_button(key: &'static str, label: &'static str, enabled: bool) -> El {
+    row()
+        .key(key)
+        .role("button")
+        .label(label)
+        .center()
+        .radius(8.0)
+        .fill(c("#ededed"))
+        .hover(if enabled { Color::WHITE } else { Color::TRANSPARENT })
+        .opacity(if enabled { 1.0 } else { 0.5 })
+        .cursor(if enabled { Cursor::Pointer } else { Cursor::Default })
+        .child(text(label).font(style(BODY, 600.0)).color(c("#141414")))
+}
+
+fn use_here() -> El {
+    light_button("usar-aqui", "Usar aquí", true).on_press(|s: &mut State| s.use_here())
 }
 
 fn folder_line(f: &Folder, size: f32, weight: f32, color: Color, p: &Pal) -> El {
@@ -396,6 +419,9 @@ fn permission_card(perm: &Permission, p: &Pal) -> El {
 }
 
 fn phase_label(s: &State) -> &'static str {
+    if s.taken {
+        return TAKEN;
+    }
     if !s.connected {
         return "Sin conexión. Reintentando…";
     }
@@ -409,6 +435,9 @@ fn phase_label(s: &State) -> &'static str {
 }
 
 fn big_label(s: &State) -> &'static str {
+    if s.taken {
+        return TAKEN;
+    }
     if !s.connected {
         return "Sin conexión";
     }
@@ -506,6 +535,12 @@ fn voice(s: &State, p: &Pal) -> El {
             .child(text(big_label(s)).key("estado-grande").font(style(17.0, 600.0)).color(p.fg).align(Align::Center))
             .child(permission_card(perm, p));
     }
+    if s.taken {
+        return view
+            .child(effect(ORB).key("bola").size(ORB_SIZE, ORB_SIZE))
+            .child(text(big_label(s)).key("estado-grande").font(style(17.0, 600.0)).color(p.fg).align(Align::Center))
+            .child(use_here().px(18.0).py(10.0));
+    }
     let show_reply = matches!(s.phase, Phase::Speaking | Phase::Idle);
     let mut reply = col().w_full().items_center().pt(REPLY_FADE);
     if show_reply && let Some(r) = s.last_reply() {
@@ -561,7 +596,7 @@ fn footer(s: &State, p: &Pal) -> El {
     let rec = s.phase == Phase::Recording;
     let key = row()
         .key("tecla")
-        .opacity(if s.phase == Phase::Permission { 0.35 } else { 1.0 })
+        .opacity(if s.phase == Phase::Permission || s.taken { 0.35 } else { 1.0 })
         .px(8.0)
         .py(3.0)
         .radius(5.0)
@@ -575,6 +610,11 @@ fn footer(s: &State, p: &Pal) -> El {
     let mut bar = row().key("pie").w_full().px(14.0).py(12.0).gap(12.0).items_center().border_sides([1.0, 0.0, 0.0, 0.0], p.line);
     if s.view == View::Voice {
         return bar.justify_center().child(key);
+    }
+    if s.taken {
+        return bar
+            .child(text(phase_label(s)).key("estado").font(style(13.0, 400.0)).color(p.fg2).grow(1.0))
+            .child(use_here().px(14.0).py(5.0));
     }
     if rec {
         bar = bar.child(el().key("punto-rec").size(8.0, 8.0).radius(4.0).fill(p.rec));

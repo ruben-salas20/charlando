@@ -108,6 +108,11 @@ fn permission(s: &mut State, view: View) {
 
 const LONG_DETAIL: &str = "for f in $(git ls-files '*.rs'); do\n  rustfmt --edition 2024 \"$f\"\ndone\ncargo build --release\ncargo test --release\ngit add -A\ngit commit -m 'Formatea todo el código con rustfmt antes de publicar'\ngit push origin main\ngh pr create --fill\necho hecho";
 
+fn taken(s: &mut State) {
+    s.connected = false;
+    s.taken = true;
+}
+
 const SCENES: &[(&str, fn(&mut State))] = &[
     ("inicio", folders),
     ("inicio-carpetas", folders),
@@ -153,6 +158,18 @@ const SCENES: &[(&str, fn(&mut State))] = &[
     ("voz-desconectado", |s| {
         conversation(s, View::Voice, Phase::Idle);
         s.connected = false;
+    }),
+    ("inicio-otro", |s| {
+        folders(s);
+        taken(s);
+    }),
+    ("chat-otro", |s| {
+        conversation(s, View::Chat, Phase::Idle);
+        taken(s);
+    }),
+    ("voz-otro", |s| {
+        conversation(s, View::Voice, Phase::Idle);
+        taken(s);
     }),
     // Sin datos de ejemplo: para probar con guiones de teclas.
     ("conversacion-vacia", |s| {

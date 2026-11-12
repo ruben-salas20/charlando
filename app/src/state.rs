@@ -119,6 +119,8 @@ pub struct State {
     /// La carpeta de la conversación abierta, del último `ready`.
     pub folder: Option<Folder>,
     pub connected: bool,
+    /// Otra app se quedó el servidor (cierre 4001): no se reintenta hasta «Usar aquí».
+    pub taken: bool,
     /// Se pulsó «Empezar» y esperamos `ready`.
     pub starting: bool,
     /// Id de la conversación abierta, para reanudarla si se cae la conexión.
@@ -160,6 +162,7 @@ impl State {
             folder_menu: false,
             folder: None,
             connected: false,
+            taken: false,
             starting: false,
             session: None,
             resuming: false,
@@ -311,8 +314,24 @@ impl State {
         self.audio.mic.cancel();
     }
 
+    /// El servidor cerró con 4001. Como perder la conexión, pero el hilo de red no reintenta.
+    pub fn on_taken(&mut self) {
+        self.on_connected(false);
+        self.taken = true;
+    }
+
+    /// «Usar aquí»: vuelve a conectar, y la otra app pasa a `taken`.
+    pub fn use_here(&mut self) {
+        if !self.taken {
+            return;
+        }
+        self.taken = false;
+        self.send(Out::Reconnect);
+    }
+
     pub fn on_connected(&mut self, connected: bool) {
         self.connected = connected;
+        self.taken = false;
         self.stop_recording_silently();
         self.audio.player.clear();
         self.starting = false;
@@ -776,6 +795,99 @@ mod tests {
         assert_eq!(s.permission, None);
         s.tick(0.0);
         assert_eq!(s.phase, Phase::Idle);
+    }
+
+    #[test]
+    fn taken_keeps_the_conversation_and_loses_the_turn() {
+        let (mut s, mut rx) = speaking(Audio::queued());
+        s.audio.player.push_pcm16(&[0; 4800]);
+        ask(&mut s);
+        s.on_taken();
+        assert!(s.taken && !s.connected);
+        assert_eq!(s.screen, Screen::Conversation);
+        assert_eq!(s.messages.len(), 2, "la conversación sigue en pantalla");
+        assert_eq!(s.session.as_deref(), Some("s1"));
+        assert_eq!(s.phase, Phase::Idle);
+        assert_eq!(s.permission, None);
+        assert!(s.audio.player.is_empty(), "el audio en cola se pierde");
+        s.ptt_down();
+        assert_eq!(s.phase, Phase::Idle, "Espacio no hace nada");
+        assert!(sent(&mut rx).is_empty());
+    }
+
+    #[test]
+    fn taken_while_recording_stops_the_mic() {
+        let (mut s, _) = at_start(Audio::null());
+        s.start();
+        s.on_message(ready("s1", "/p/uno"));
+        s.ptt_down();
+        s.on_taken();
+        assert_eq!(s.phase, Phase::Idle);
+        s.ptt_up();
+        assert_eq!(s.phase, Phase::Idle, "soltar Espacio no envía nada");
+    }
+
+    #[test]
+    fn start_does_nothing_while_taken() {
+        let (mut s, mut rx) = at_start(Audio::null());
+        s.on_taken();
+        s.start();
+        assert!(!s.starting);
+        assert!(sent(&mut rx).is_empty());
+        assert_eq!(s.screen, Screen::Start);
+        assert_eq!(s.place, Some(Where::Folder("/p/uno".into())), "lo elegido se conserva");
+    }
+
+    #[test]
+    fn use_here_asks_to_reconnect_once() {
+        let (mut s, mut rx) = at_start(Audio::null());
+        s.use_here();
+        assert!(sent(&mut rx).is_empty(), "solo en `taken`");
+        s.on_taken();
+        s.use_here();
+        assert_eq!(sent(&mut rx), vec![Out::Reconnect]);
+        assert!(!s.taken, "mientras conecta es una desconexión normal");
+        s.use_here();
+        assert!(sent(&mut rx).is_empty());
+    }
+
+    #[test]
+    fn use_here_in_a_conversation_resumes_it() {
+        let (mut s, mut rx) = speaking(Audio::null());
+        s.on_taken();
+        s.use_here();
+        s.on_connected(true);
+        assert_eq!(
+            sent(&mut rx),
+            vec![Out::Reconnect, Out::Resume { folder: "/p/uno".into(), model: "haiku", thinking: s.thinking, session: "s1".into() }]
+        );
+        assert!(!s.can_talk(), "no se habla hasta `ready`");
+        s.on_message(ready("s1", "/p/uno"));
+        assert!(s.can_talk());
+        assert_eq!(s.messages.len(), 2);
+    }
+
+    #[test]
+    fn plus_while_taken_goes_to_start_and_stays_taken() {
+        let (mut s, mut rx) = speaking(Audio::null());
+        s.on_taken();
+        s.new_conversation();
+        assert_eq!(s.screen, Screen::Start);
+        assert!(s.messages.is_empty());
+        assert!(s.taken);
+        assert!(sent(&mut rx).is_empty());
+    }
+
+    #[test]
+    fn use_here_on_start_lets_you_start() {
+        let (mut s, mut rx) = at_start(Audio::null());
+        s.on_taken();
+        s.use_here();
+        s.on_connected(true);
+        s.on_message(hello(vec![folder("/p/uno")]));
+        assert_eq!(sent(&mut rx), vec![Out::Reconnect]);
+        s.start();
+        assert_eq!(sent(&mut rx), vec![Out::Start { place: Where::Folder("/p/uno".into()), model: "haiku", thinking: s.thinking }]);
     }
 
     #[test]
