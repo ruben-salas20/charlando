@@ -256,6 +256,7 @@ class Estado(
             }
             is In.Error -> {
                 error = msg.message
+                starting = false
                 replyEnded = true
                 permission = null
             }

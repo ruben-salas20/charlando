@@ -272,6 +272,16 @@ class EstadoTest {
     }
 
     @Test
+    fun anErrorOnStartLetsYouStartAgain() {
+        val s = Estado({ sent.add(it) }, NullMic(), player, store)
+        s.onConnected(true)
+        s.onMessage(In.Hello(listOf(proyecto), "/charlas"))
+        s.start()
+        s.onMessage(In.Error("falló"))
+        assertTrue("se puede volver a empezar", !s.starting)
+    }
+
+    @Test
     fun thePermissionCardOpensWhenTheQueueIsEmpty() {
         val s = connected()
         askPermission(s)

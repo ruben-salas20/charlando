@@ -412,6 +412,7 @@ impl State {
             }
             In::Error(message) => {
                 self.error = Some(message);
+                self.starting = false;
                 self.reply_ended = true;
                 self.drop_permission();
             }
@@ -757,6 +758,14 @@ mod tests {
         assert_eq!(s.phase, Phase::Idle);
         assert_eq!(s.permission, None);
         assert_eq!(s.screen, Screen::Conversation);
+    }
+
+    #[test]
+    fn an_error_on_start_lets_you_start_again() {
+        let (mut s, _) = at_start(Audio::null());
+        s.start();
+        s.on_message(In::Error("falló".into()));
+        assert!(!s.starting, "se puede volver a pulsar «Empezar»");
     }
 
     #[test]
