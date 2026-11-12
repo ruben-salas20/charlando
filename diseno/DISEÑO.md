@@ -22,7 +22,7 @@ Maqueta interactiva: `maqueta.html` (abrir en un navegador con WebGL); la del te
    - El punto de la barra se pone gris (no rojo: no es un fallo).
    - **Inicio:** encima del botón aparece el texto «Charlando está abierto en otro dispositivo.» y el botón «Empezar» pasa a decir «Usar aquí».
    - **Chat:** el pie muestra «Abierto en otro dispositivo» y, a la derecha, el botón «Usar aquí» en lugar de la tecla Espacio y el nivel de audio.
-   - **Voz:** la bola, apagada como en desconectado; debajo, «Abierto en otro dispositivo» y el botón «Usar aquí».
+   - **Voz:** la bola, apagada como en desconectado; debajo, solo «Abierto en otro dispositivo» y el botón «Usar aquí» (sin la pregunta ni la respuesta).
    - En el teléfono, el botón grande de hablar pasa a ser «Usar aquí».
    - «Usar aquí» usa el estilo del botón «Empezar». Al pulsarlo, la app vuelve a conectar y la otra pasa a este estado.
 
