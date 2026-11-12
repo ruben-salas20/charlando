@@ -139,7 +139,7 @@ private fun Bar(s: Estado, onSettings: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.weight(1f).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(if (s.connected) Ok else Rec))
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (s.connected) Ok else if (s.taken) Fg3 else Rec))
             Spacer(Modifier.size(8.dp))
             val name = if (conversation) s.current?.name ?: "Charlando" else "Charlando"
             Text(name, style = style(16.sp, FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -249,15 +249,22 @@ private fun Inicio(s: Estado, onFolders: () -> Unit, onStart: () -> Unit) {
                 )
             }
         }
-        val ready = s.connected && !s.starting
-        BotonClaro("Empezar", enabled = ready, onClick = onStart)
+        if (s.taken) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(TAKEN_NOTE, style = style(13.sp, color = Fg2))
+                BotonClaro(USE_HERE, onClick = s::useHere)
+            }
+        } else {
+            val ready = s.connected && !s.starting
+            BotonClaro("Empezar", enabled = ready, onClick = onStart)
+        }
     }
 }
 
 @Composable
-private fun BotonClaro(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun BotonClaro(label: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().alpha(if (enabled) 1f else .5f).clip(RoundedCornerShape(14.dp))
+        modifier.fillMaxWidth().alpha(if (enabled) 1f else .5f).clip(RoundedCornerShape(14.dp))
             .background(Fg).tap(enabled = enabled, onClick = onClick).padding(14.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -357,7 +364,11 @@ private fun Ajustes(open: Boolean, url: String, onSave: (String) -> Unit, onDism
     }
 }
 
-private fun phaseLabel(s: Estado) = if (!s.connected) "Sin conexión. Reintentando…" else when (s.phase) {
+private const val TAKEN_NOTE = "Charlando está abierto en otro dispositivo."
+private const val TAKEN = "Abierto en otro dispositivo"
+private const val USE_HERE = "Usar aquí"
+
+private fun phaseLabel(s: Estado) = if (s.taken) TAKEN else if (!s.connected) "Sin conexión. Reintentando…" else when (s.phase) {
     Phase.Idle -> ""
     Phase.Recording -> "Grabando… toca para enviar"
     Phase.Thinking -> "Pensando…"
@@ -365,7 +376,7 @@ private fun phaseLabel(s: Estado) = if (!s.connected) "Sin conexión. Reintentan
     Phase.Permission -> "Esperando tu permiso"
 }
 
-private fun bigLabel(s: Estado) = if (!s.connected) "Sin conexión" else when (s.phase) {
+private fun bigLabel(s: Estado) = if (s.taken) TAKEN else if (!s.connected) "Sin conexión" else when (s.phase) {
     Phase.Idle -> "Toca la bola para hablar"
     Phase.Recording -> "Te escucho"
     Phase.Thinking -> "Pensando…"
@@ -465,6 +476,10 @@ private fun Pie(s: Estado, onTap: () -> Unit) {
     ) {
         val label = phaseLabel(s)
         if (label.isNotEmpty()) Text(label, style = style(13.sp, color = Fg2))
+        if (s.taken) {
+            BotonClaro(USE_HERE, onClick = s::useHere)
+            return@Column
+        }
         val shape = RoundedCornerShape(30.dp)
         val fg = if (rec) Color.White else Fg
         Row(
@@ -515,6 +530,10 @@ private fun Voz(s: Estado, onTap: () -> Unit, modifier: Modifier) {
         Text(bigLabel(s), style = style(19.sp, FontWeight.SemiBold), textAlign = TextAlign.Center)
         if (card != null) {
             Tarjeta(card, s::answer)
+            return@Column
+        }
+        if (s.taken) {
+            BotonClaro(USE_HERE, Modifier.widthIn(max = 300.dp), onClick = s::useHere)
             return@Column
         }
         // Alto fijo para que la bola no se mueva con el texto.

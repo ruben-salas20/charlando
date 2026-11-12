@@ -34,11 +34,12 @@ class Charla(app: Application) : AndroidViewModel(app) {
     private val player = AndroidPlayer()
     private val red = Red(
         onConnected = { c -> main.post { estado.onConnected(c) } },
+        onTaken = { main.post { estado.onTaken() } },
         onMessage = { m -> main.post { estado.onMessage(m) } },
         onAudio = { pcm -> player.pushPcm16(pcm) },
     )
     private val mic = AndroidMic()
-    val estado: Estado = Estado(red, mic, player, prefs)
+    val estado: Estado = Estado(red, mic, player, prefs, reconnect = red::reconnect)
 
     var url by mutableStateOf(prefs.url)
         private set

@@ -58,6 +58,8 @@ class Estado(
     private val mic: Mic,
     private val player: Player,
     private val store: Store,
+    /** Pide a la red que vuelva a conectar tras «Usar aquí». */
+    private val reconnect: () -> Unit = {},
 ) {
     var screen by mutableStateOf(Screen.Start)
     var view by mutableStateOf(store.loadView())
@@ -79,6 +81,9 @@ class Estado(
     var thinking by mutableStateOf(store.loadThinking())
         private set
     var connected by mutableStateOf(false)
+    /** Otro dispositivo se quedó la conexión (cierre 4001): no se reintenta hasta «Usar aquí». */
+    var taken by mutableStateOf(false)
+        internal set
     /** Se pulsó «Empezar» y esperamos `ready`. */
     var starting by mutableStateOf(false)
     /** Id de la conversación abierta, para reanudarla si se cae la conexión. */
@@ -109,6 +114,13 @@ class Estado(
         if (!connected || starting) return
         starting = true
         send(Out.Start(folder?.path, model.id, thinking))
+    }
+
+    /** «Usar aquí»: vuelve a conectar; al abrirse sigue como cualquier reconexión. */
+    fun useHere() {
+        if (!taken) return
+        taken = false
+        reconnect()
     }
 
     fun chooseFolder(f: Folder?) {
@@ -177,6 +189,7 @@ class Estado(
 
     fun onConnected(isConnected: Boolean) {
         connected = isConnected
+        taken = false
         mic.cancel()
         player.clear()
         starting = false
@@ -197,6 +210,12 @@ class Estado(
             starting = true
             send(Out.Start(path, model.id, thinking))
         }
+    }
+
+    /** El cerebro cerró con 4001: se pierde lo mismo que al caerse la conexión. */
+    fun onTaken() {
+        onConnected(false)
+        taken = true
     }
 
     fun onMessage(msg: In) {
