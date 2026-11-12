@@ -1,0 +1,13 @@
+[Unit]
+Description=Charlando: cerebro (sesión de Claude Code por voz)
+
+[Service]
+# RUTA_DEL_REPO se sustituye al instalar (ver README).
+WorkingDirectory=RUTA_DEL_REPO/cerebro
+ExecStart=RUTA_DEL_REPO/cerebro/.venv/bin/python cerebro.py
+# Claude Code y las herramientas que lance (git, uv…) se buscan en este PATH.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+# Si la IP de CHARLANDO_HOST aún no existe (red privada arrancando), reintenta.
+Restart=on-failure
+RestartSec=5
