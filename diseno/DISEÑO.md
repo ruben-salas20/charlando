@@ -13,8 +13,8 @@ Maqueta interactiva: `maqueta.html` (abrir en un navegador con WebGL); la del te
    - **Voz:** bola de metal líquido, el estado debajo, tu última pregunta y la respuesta en curso.
    - **Pie:** estado, nivel de audio y la tecla «Espacio» (roja mientras graba). En Voz, solo la tecla.
 3. **Tarjeta de permiso.** Aparece cuando Claude necesita permiso para una herramienta:
-   - Título «Claude necesita tu permiso» y debajo qué quiere hacer («Ejecutar un comando», «Escribir un archivo»…).
-   - El `detail` del protocolo tal cual, en letra de código (IBM Plex Mono), en un recuadro que parte las líneas largas.
+   - Título «Claude necesita tu permiso» y debajo qué quiere hacer, según `tool`: `Bash` → «Ejecutar un comando»; `Write`, `Edit`, `NotebookEdit` → «Escribir un archivo»; `Task` o `Agent` → «Lanzar un subagente»; los que empiezan por `mcp__` → «Usar un conector»; cualquier otra → «Usar <tool>».
+   - El `detail` del protocolo tal cual, en letra de código (IBM Plex Mono), en un recuadro que parte las líneas largas. El recuadro tiene una altura máxima y se desplaza, para que los botones no salgan de la pantalla.
    - Dos botones: «Rechazar» (gris) y «Aceptar» (claro).
    - En Chat va debajo de la última respuesta. En Voz sustituye al texto, y la bola se hace más pequeña.
 
@@ -23,6 +23,7 @@ Maqueta interactiva: `maqueta.html` (abrir en un navegador con WebGL); la del te
 - Pulsar para hablar: mantener Espacio graba y soltarlo envía.
 - «+» vuelve al inicio y borra la conversación. Cambiar de modelo o de carpeta obliga a empezar de nuevo.
 - **Carpeta inicial:** la que se pasa al lanzar la app (`charlando` desde una terminal pasa la carpeta actual). Si no hay ninguna, la más reciente. Si la lista está vacía, «Charla nueva».
+- **Rutas:** se muestran absolutas, como llegan del cerebro. Si no caben, se cortan por el principio («…/mi-proyecto»). Debajo de «+ Charla nueva» va «en <charlas>», del `hello`.
 - **Barra:** el nombre de la carpeta se corta con «…» si no cabe. Al pasar el ratón se ve la ruta completa.
 - **Copiar:** el icono de dos cuadrados copia `cd '<carpeta>' && claude --resume <session>` al portapapeles, para seguir la conversación en la terminal. Solo en el escritorio.
 - **Permiso:** la tarjeta se responde solo con el ratón o el dedo. Mientras está abierta, Espacio (o el botón de hablar en el teléfono) no hace nada y se ve apagado. Antes de la tarjeta, Claude dice «Necesito tu permiso. Míralo en pantalla.»; si pasa 1 minuto, lo repite una vez.

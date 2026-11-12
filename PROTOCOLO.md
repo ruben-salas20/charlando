@@ -9,7 +9,7 @@ El cerebro no hace ASR ni TTS: se los pide al servicio de voz (`voz/`). Ese cont
 
 - URL: `ws://<host>:<puerto>/ws`. La app la lee de la variable `CHARLANDO_URL` (por defecto `ws://127.0.0.1:8765/ws`); el cerebro escucha donde digan `CHARLANDO_HOST` y `CHARLANDO_PORT` en su `.env`.
 - El cerebro atiende **un cliente a la vez**: si llega otro, cierra la conexión anterior.
-- Al abrirse la conexión, el cerebro envía `hello` con las carpetas recientes.
+- Al abrirse la conexión, el cerebro envía `hello` con las carpetas recientes. Lo vuelve a enviar justo después de cada `ready`, con la lista actualizada.
 - La app reintenta cada 2 s mientras no hay conexión. El punto de la barra está verde con el socket abierto y rojo si no.
 
 ## Mensajes
@@ -38,7 +38,7 @@ El botón «+» vuelve a la pantalla de inicio en la app. El cerebro no se enter
 
 | Mensaje | Significado |
 |---|---|
-| `{"type":"hello","folders":[{"path":"/ruta","name":"proyecto"}]}` | Llega al conectar. Carpetas recientes, la más reciente primero, como mucho 8. `name` es el último tramo de la ruta. Puede ser una lista vacía |
+| `{"type":"hello","folders":[{"path":"/ruta","name":"proyecto"}],"charlas":"/ruta/de/charlas"}` | Llega al conectar y tras cada `ready`. Carpetas recientes, la más reciente primero, como mucho 8. `name` es el último tramo de la ruta. Puede ser una lista vacía. `charlas` es la carpeta donde se crean las de «Charla nueva». La app actualiza la lista sin cambiar una carpeta que la persona ya eligió |
 | `{"type":"ready","model":"haiku","session":"<id>","folder":"/ruta","name":"proyecto"}` | Conversación lista. `session` identifica la conversación para reanudarla. `folder` es la carpeta en la que trabaja Claude |
 | `{"type":"state","state":"thinking"}` | Tras `ptt_end`: transcribe y espera a Claude |
 | `{"type":"transcript","text":"..."}` | Lo que entendió el ASR. Va en la burbuja «Tú» |
@@ -82,9 +82,9 @@ Reglas de la tarjeta:
 - `recording` lo decide la app; el cerebro no lo envía.
 - La app pasa a `idle` cuando llega `reply_end` **y** ha terminado de reproducir el audio que tenía en cola.
 - Un turno puede alternar `speaking` → `thinking` → `speaking` cuando Claude usa herramientas. La app pasa a `thinking` cuando termina de sonar el audio en cola, y todas las frases del turno van a la misma burbuja de Claude.
-- **`permission`** es un estado de la app: entra al recibir `permission`, cuando termina de sonar el audio en cola, y sale al pulsar un botón (pasa a `thinking`). En este estado la app muestra la tarjeta e ignora Espacio.
+- **`permission`** es un estado de la app. Un mensaje `permission` solo se acepta en `thinking` o `speaking`; en otro estado se ignora. El estado entra cuando termina de sonar el audio en cola, y sale al pulsar un botón (pasa a `thinking`). En este estado la app muestra la tarjeta e ignora Espacio.
 - En `thinking`, `speaking` y `permission`, la app ignora Espacio: en esta versión no se interrumpe a Claude.
-- Si se cae la conexión, la app pasa a `disconnected` y conserva la conversación en pantalla. El turno en curso y la tarjeta de permiso se pierden.
+- Si se cae la conexión, la app pasa a `disconnected` y conserva la conversación en pantalla. El turno en curso y la tarjeta de permiso se pierden. La tarjeta también se pierde con «+» o con un `error`, que además termina el turno.
 - Al reconectar dentro de una conversación, la app envía `start` con `folder` y `resume`, y no deja hablar hasta recibir `ready`. Si aún no se había dicho nada, no hay nada que reanudar: envía un `start` normal con la misma carpeta y el mismo modelo.
 
 ## Nivel de audio para la bola
