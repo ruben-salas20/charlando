@@ -83,6 +83,32 @@
   .last .q { color: var(--fg3); margin-bottom: 8px; }
   .tip { color: var(--fg3); font-size: 12.5px; padding-bottom: 22px; flex: none; text-align: center; }
 
+  /* carpeta */
+  .folder { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px;
+            background: var(--l1); border: 1px solid var(--line); cursor: pointer; }
+  .folder .n { font-weight: 500; }
+  .path { color: var(--fg3); font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .folder .chev { margin-left: auto; color: var(--fg3); }
+  .list .it { display: flex; flex-direction: column; padding: 12px 14px; border-radius: 12px; }
+  .list .it.on { background: var(--l2); }
+  .list .sep { height: 1px; background: var(--line); margin: 4px 0; }
+  .list .new { color: var(--fg2); }
+  .name .where { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { min-width: 0; padding-right: 8px; }
+  /* permiso */
+  .perm { display: none; background: var(--l1); border: 1px solid var(--accent); border-radius: 14px; padding: 14px; text-align: left; width: 100%; }
+  .perm .h { font-weight: 600; margin-bottom: 2px; }
+  .perm .tool { color: var(--fg3); font-size: 13px; margin-bottom: 10px; }
+  .perm pre { font-family: "IBM Plex Mono", monospace; font-size: 13px; background: #0f0f0f; border: 1px solid var(--line);
+              border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; word-break: break-all; margin-bottom: 12px; }
+  .perm .btns { display: flex; gap: 10px; }
+  .perm button { all: unset; flex: 1; text-align: center; cursor: pointer; padding: 13px 0; border-radius: 12px; font-weight: 600; }
+  .perm .no { background: var(--l3); color: var(--fg); }
+  .perm .yes { background: #ededed; color: #141414; }
+  .perm-on .perm { display: block; }
+  .perm-on .voice .last { display: none; }
+  .perm-on .voice .orb { width: 130px; height: 130px; }
+  .perm-on .hold { opacity: .35; }
   [data-view="chat"] .voice, [data-view="chat"] .tip, [data-view="voz"] .chat, [data-view="voz"] .ptt { display: none; }
 </style>
 </head>
@@ -92,6 +118,7 @@
   <div class="seg" id="seg">
     <button data-s="idle">En espera</button><button data-s="rec">Grabando</button>
     <button data-s="think">Pensando</button><button data-s="speak" class="on">Hablando</button>
+    <button data-s="perm">Permiso</button>
   </div>
   <span style="margin-left:16px">Servidor:</span>
   <div class="seg" id="net"><button data-c="on" class="on">Conectado</button><button data-c="off">Desconectado</button></div>
@@ -99,13 +126,15 @@
 
 <div class="row">
   <div>
-    <p class="caption"><b>1 · Inicio.</b> Igual que en el escritorio. El engranaje abre los ajustes.</p>
+    <p class="caption"><b>1 · Inicio.</b> Igual que en el escritorio: carpeta, modelo y «Razonar». El engranaje abre los ajustes.</p>
     <div class="phone">
       <div class="status"><span>9:41</span><span>▴ ▮</span></div>
       <div class="bar"><span class="name"><span class="dot"></span>Charlando</span><span></span>
         <span class="right"><button class="icon" title="Ajustes"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></span></div>
       <div class="start">
-        <div><h1>Charlando</h1><p>Elige con quién hablar.</p></div>
+        <div><h1>Charlando</h1><p>Elige dónde y con quién hablar.</p></div>
+        <div><div class="label">Carpeta</div>
+          <div class="folder"><div><div class="n">mi-proyecto</div><div class="path">~/proyectos/mi-proyecto</div></div><span class="chev">▾</span></div></div>
         <div><div class="label">Modelo</div>
           <div class="opts">
             <div class="opt on"><span class="radio"></span><div><div class="n">Claude Haiku 5.5</div><div class="d">El más rápido</div></div></div>
@@ -124,7 +153,7 @@
       <div class="status"><span>9:41</span><span>▴ ▮</span></div>
       <div class="bar"><span class="name"><span class="dot"></span>Charlando</span><span></span>
         <span class="right"><button class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></span></div>
-      <div class="start" style="opacity:.35"><div><h1>Charlando</h1><p>Elige con quién hablar.</p></div></div>
+      <div class="start" style="opacity:.35"><div><h1>Charlando</h1><p>Elige dónde y con quién hablar.</p></div></div>
       <div class="scrim"></div>
       <div class="sheet">
         <div class="grab"></div>
@@ -137,6 +166,26 @@
   </div>
 
   <div>
+    <p class="caption"><b>2b · Elegir carpeta.</b> Hoja que sube desde abajo, con las carpetas recientes del cerebro y «Charla nueva».</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>▴ ▮</span></div>
+      <div class="bar"><span class="name"><span class="dot"></span>Charlando</span><span></span><span class="right"></span></div>
+      <div class="start" style="opacity:.35"><div><h1>Charlando</h1><p>Elige dónde y con quién hablar.</p></div></div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div style="font-weight:600;font-size:17px">Carpeta</div>
+        <div class="list">
+          <div class="it on"><span class="n">mi-proyecto</span><span class="path">~/proyectos/mi-proyecto</span></div>
+          <div class="it"><span class="n">notas</span><span class="path">~/notas</span></div>
+          <div class="it"><span class="n">trabajo</span><span class="path">~/trabajo/cliente</span></div>
+          <div class="sep"></div>
+          <div class="it new"><span>+ Charla nueva</span><span class="path">en ~/charlando</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
     <p class="caption"><b>3 · Chat.</b> Abajo, un botón grande: tócalo para hablar y otra vez para enviar.</p>
     <div class="phone conv" data-view="chat"></div>
   </div>
@@ -148,7 +197,7 @@
 
 <template id="tpl">
   <div class="status"><span>9:41</span><span>▴ ▮</span></div>
-  <div class="bar"><span class="name"><span class="dot"></span>Charlando</span>
+  <div class="bar"><span class="name"><span class="dot"></span><span class="where">mi-proyecto</span></span>
     <div class="seg sm"><button data-v="chat">Chat</button><button data-v="voz">Voz</button></div>
     <span class="right"><button class="icon" title="Nueva conversación">+</button></span></div>
   <div class="chat">
@@ -156,11 +205,23 @@
     <div><div class="who">Claude</div><div>Es un tramo medido de una traza: tiene inicio, fin y atributos. Cada etapa de la cascada sería un span.</div></div>
     <div class="you"><div class="who">Tú</div><div class="text">¿Y cómo veo cuál etapa es la más lenta?</div></div>
     <div data-reply><div class="who">Claude</div><div data-t></div></div>
+    <div class="perm">
+      <div class="h">Claude necesita tu permiso</div>
+      <div class="tool">Ejecutar un comando</div>
+      <pre>git push origin main</pre>
+      <div class="btns"><button class="no">Rechazar</button><button class="yes">Aceptar</button></div>
+    </div>
   </div>
   <div class="voice">
     <canvas class="orb" data-preset="gunmetal" width="440" height="440"></canvas>
     <div class="bigstate" data-big></div>
     <div class="last"><div class="q">«¿Y cómo veo cuál etapa es la más lenta?»</div><div data-reply><span data-t></span></div></div>
+    <div class="perm">
+      <div class="h">Claude necesita tu permiso</div>
+      <div class="tool">Ejecutar un comando</div>
+      <pre>git push origin main</pre>
+      <div class="btns"><button class="no">Rechazar</button><button class="yes">Aceptar</button></div>
+    </div>
   </div>
   <div class="tip" data-tip></div>
   <div class="ptt"><span class="state" data-st></span>
@@ -170,9 +231,9 @@
 <script>
 let state = "speak";
 const REPLY = "Mira el span de cada etapa: el más largo es tu cuello de botella. Aquí suele ser el ASR.";
-const ST = { idle: "", rec: "Grabando… toca para enviar", think: "Pensando…", speak: "Claude habla…" };
-const HOLD = { idle: "Toca para hablar", rec: "Toca para enviar", think: "Toca para hablar", speak: "Toca para hablar" };
-const BIG = { idle: "Toca la bola para hablar", rec: "Te escucho", think: "Pensando…", speak: "Hablando" };
+const ST = { idle: "", rec: "Grabando… toca para enviar", think: "Pensando…", speak: "Claude habla…", perm: "Esperando tu permiso" };
+const HOLD = { idle: "Toca para hablar", rec: "Toca para enviar", think: "Toca para hablar", speak: "Toca para hablar", perm: "Toca para hablar" };
+const BIG = { idle: "Toca la bola para hablar", rec: "Te escucho", think: "Pensando…", speak: "Hablando", perm: "Esperando tu permiso" };
 const convs = document.querySelectorAll(".conv");
 convs.forEach(c => {
   c.append(document.getElementById("tpl").content.cloneNode(true));
@@ -183,6 +244,7 @@ function render() {
   document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.s === s));
   convs.forEach(c => {
     c.classList.toggle("rec", s === "rec");
+    c.classList.toggle("perm-on", s === "perm");
     c.classList.toggle("busy", s === "think" || s === "speak" || off);
     c.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === c.dataset.view));
     c.querySelector("[data-st]").textContent = off ? "Sin conexión. Reintentando…" : ST[s];
@@ -192,7 +254,7 @@ function render() {
     const on = s === "rec" || s === "speak";
     c.querySelectorAll("[data-n]").forEach(m => m.innerHTML = Array.from({ length: +m.dataset.n }, (_, i) =>
       `<i style="height:${on && s === "rec" ? 4 + Math.round(Math.abs(Math.sin(i * 1.7)) * 14) : 4}px"></i>`).join(""));
-    c.querySelectorAll("[data-reply]").forEach(e => e.style.visibility = (s === "speak" || s === "idle") ? "" : "hidden");
+    c.querySelectorAll("[data-reply]").forEach(e => e.style.visibility = (s === "speak" || s === "idle" || s === "perm") ? "" : "hidden");
     c.querySelectorAll("[data-t]").forEach(e => e.innerHTML = s === "speak" ? REPLY.slice(0, 52) + '<span class="caret"></span>' : REPLY);
   });
 }
@@ -281,7 +343,7 @@ document.querySelectorAll("canvas.orb").forEach(cv => {
   let tt = 0, ang = 0, last = performance.now();
   (function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000); last = now;
-    const st = cv.dataset.think ? "think" : state;
+    const st = cv.dataset.think ? "think" : (state === "perm" ? "idle" : state);
     const g = target(st, now, base, mode), k = Math.min(1, dt * 7);
     for (const key of ["flow", "speed", "scale", "size", "irid", "contrast"]) cur[key] += (g[key] - cur[key]) * k;
     for (let i = 0; i < 3; i++) cur.light[i] += (g.light[i] - cur.light[i]) * k;

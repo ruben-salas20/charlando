@@ -1,19 +1,31 @@
 # Charlando: diseño de la interfaz
 
-Maqueta interactiva: `maqueta.html` (abrir en un navegador con WebGL). Cerrado el 2026-11-08.
+Maqueta interactiva: `maqueta.html` (abrir en un navegador con WebGL); la del teléfono, `maqueta-android.html`. Cerrado el 2026-11-08; carpetas y permisos añadidos el 2026-11-12.
 
 ## Pantallas
 
-1. **Inicio.** Título «Charlando» y la lista de modelos: Claude Haiku 5.5 (marcado por defecto), Sonnet 5.5 y Opus 5.5. Botón «Empezar».
-2. **Conversación.** Barra superior: punto de conexión (verde o rojo) junto a «Charlando», selector «Chat / Voz» en el centro y botón «+» a la derecha.
+1. **Inicio.** Título «Charlando» y el texto «Elige dónde y con quién hablar». Tres bloques y el botón «Empezar»:
+   - **Carpeta:** un selector con el nombre y la ruta de la carpeta. Al abrirlo, la lista de carpetas recientes y, al final, «+ Charla nueva». En el teléfono la lista sube como una hoja desde abajo.
+   - **Modelo:** Claude Haiku 5.5 (marcado por defecto), Sonnet 5.5 y Opus 5.5.
+   - **Razonar:** interruptor, apagado por defecto.
+2. **Conversación.** Barra superior: punto de conexión (verde o rojo) junto al nombre de la carpeta, selector «Chat / Voz» en el centro y, a la derecha, el botón de copiar (solo escritorio) y «+».
    - **Chat:** mensajes de «Tú» y «Claude». La respuesta se escribe mientras suena.
    - **Voz:** bola de metal líquido, el estado debajo, tu última pregunta y la respuesta en curso.
    - **Pie:** estado, nivel de audio y la tecla «Espacio» (roja mientras graba). En Voz, solo la tecla.
+3. **Tarjeta de permiso.** Aparece cuando Claude necesita permiso para una herramienta:
+   - Título «Claude necesita tu permiso» y debajo qué quiere hacer («Ejecutar un comando», «Escribir un archivo»…).
+   - El `detail` del protocolo tal cual, en letra de código (IBM Plex Mono), en un recuadro que parte las líneas largas.
+   - Dos botones: «Rechazar» (gris) y «Aceptar» (claro).
+   - En Chat va debajo de la última respuesta. En Voz sustituye al texto, y la bola se hace más pequeña.
 
 ## Comportamiento
 
 - Pulsar para hablar: mantener Espacio graba y soltarlo envía.
-- «+» vuelve al inicio y borra la conversación. Cambiar de modelo obliga a empezar de nuevo.
+- «+» vuelve al inicio y borra la conversación. Cambiar de modelo o de carpeta obliga a empezar de nuevo.
+- **Carpeta inicial:** la que se pasa al lanzar la app (`charlando` desde una terminal pasa la carpeta actual). Si no hay ninguna, la más reciente. Si la lista está vacía, «Charla nueva».
+- **Barra:** el nombre de la carpeta se corta con «…» si no cabe. Al pasar el ratón se ve la ruta completa.
+- **Copiar:** el icono de dos cuadrados copia `cd '<carpeta>' && claude --resume <session>` al portapapeles, para seguir la conversación en la terminal. Solo en el escritorio.
+- **Permiso:** la tarjeta se responde solo con el ratón o el dedo. Mientras está abierta, Espacio (o el botón de hablar en el teléfono) no hace nada y se ve apagado. Antes de la tarjeta, Claude dice «Necesito tu permiso. Míralo en pantalla.»; si pasa 1 minuto, lo repite una vez.
 - Sin tiempos por etapa en la interfaz, por ahora.
 - Vista inicial: por decidir (propuesta: recordar la última y empezar en Chat).
 
@@ -27,4 +39,5 @@ Efecto `LiquidMetalParams` de `rune-fx`, preset **gunmetal**. El nivel de voz mu
 | Grabando | Ondas hacia dentro (`speed` negativa), se encoge con tu volumen y la luz se vuelve roja (`light`) |
 | Pensando | Barrido de luz: casi quieta (`flow` 0,15) y la luz va y viene (`angle` oscila ±1,1 rad) |
 | Hablando | Ondas hacia fuera y crece con el volumen de la voz de Claude |
+| Esperando permiso | Como en espera, pero más pequeña, para dejar sitio a la tarjeta. Texto: «Esperando tu permiso» |
 | Desconectado | Quieta, más pequeña y apagada (`flow` 0, más contraste) |

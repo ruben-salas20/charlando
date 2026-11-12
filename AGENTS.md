@@ -1,13 +1,15 @@
 # Charlando
 
-Cascada de voz: `app/` (Rust + Rune) graba y reproduce, y `android/` (Kotlin + Compose) es su equivalente para el teléfono; `servidor/` (Python) hace ASR con LFM3, llama a Claude por el Agent SDK y sintetiza con LFM3. Contexto general en `README.md`.
+Cascada de voz: `app/` (Rust + Rune) graba y reproduce, y `android/` (Kotlin + Compose) es su equivalente para el teléfono; `cerebro/` (Python) abre una sesión de Claude Code con el Agent SDK en la carpeta que elige la persona, y `voz/` (Python) hace el ASR y el TTS con LFM3 en la GPU. Contexto general en `README.md`; el plan de esta arquitectura, en `diseno/cerebro-local.md`.
+
+`servidor/` es la versión anterior, que hacía las dos cosas. Se borra cuando `cerebro/` y `voz/` funcionen juntos.
 
 ## Reglas
 
-- **`PROTOCOLO.md` es el contrato.** Un cambio en los mensajes se hace en `PROTOCOLO.md`, `app/src/net.rs` y `servidor/servidor.py` en el mismo commit.
-- **Repo público: nada de la máquina en el código.** IPs, rutas y hosts van a `servidor/.env` (documentado en `.env.example`) o a `~/.config/charlando/charlando.env` (`despliegue/charlando.env.example`).
+- **Hay dos contratos.** `PROTOCOLO.md` (app ↔ cerebro): un cambio va en `PROTOCOLO.md`, `app/src/net.rs`, el cliente de `android/` y `cerebro/` en el mismo commit. `PROTOCOLO-VOZ.md` (cerebro ↔ voz): un cambio va en `PROTOCOLO-VOZ.md`, `cerebro/` y `voz/` en el mismo commit.
+- **Repo público: nada de la máquina en el código.** IPs, rutas y hosts van al `.env` de cada servicio (documentado en su `.env.example`) o a `~/.config/charlando/charlando.env` (`despliegue/charlando.env.example`).
 - **Rune es prerelease y no lo conoces.** Antes de usar su API, búscala en el commit fijado en `app/Cargo.toml` (`~/.cargo/git/checkouts/rune-*/`); empieza por `crates/rune/README.md`.
-- **La GPU se usa desde un solo hilo** (`GPU` en `servidor.py`): todo `generate` y `codec.decode` pasa por ese executor.
+- **La GPU se usa desde un solo hilo** (`GPU` en `voz/`): todo `generate` y `codec.decode` pasa por ese executor.
 - **Velocidad frente a calidad lo decide la persona** (razonamiento, longitud de respuesta, tamaño de los trozos de audio): propón con datos medidos y espera respuesta.
 - Textos de la interfaz en español, según `diseno/DISEÑO.md` y `diseno/maqueta.html` (`diseno/maqueta-android.html` en Android).
 - **`android/` se comporta igual que `app/`.** `Estado.kt` traduce `app/src/state.rs` y `EstadoTest.kt` sus tests: un cambio en uno va al otro.

@@ -85,6 +85,44 @@
   .recdot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); display: none; }
   .rec .recdot { display: block; }
   .colors { margin-top: 36px; }
+
+  /* carpeta */
+  .folder { cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px;
+            background: var(--l1); border: 1px solid var(--line); }
+  .folder:hover { background: var(--l2); }
+  .folder .path, .menu .path { color: var(--fg3); font-family: var(--mono); font-size: 11.5px; }
+  .folder .n { font-weight: 500; }
+  .folder .chev { margin-left: auto; color: var(--fg3); }
+  .menu { margin-top: 6px; background: var(--l2); border: 1px solid var(--line); border-radius: 8px; padding: 4px;
+          box-shadow: 0 12px 30px rgba(0,0,0,.45); }
+  .menu .it { display: flex; align-items: baseline; gap: 10px; padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+  .menu .it:hover, .menu .it.on { background: var(--l3); }
+  .menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
+  .menu .it.new { color: var(--fg2); }
+  .toggle { display: flex; align-items: center; gap: 12px; }
+  .toggle .d { color: var(--fg3); font-size: 12.5px; }
+  .sw { margin-left: auto; width: 34px; height: 20px; border-radius: 10px; background: var(--l3); position: relative; flex: none; }
+  .sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #ededed; }
+  .title .name { min-width: 0; white-space: nowrap; padding-right: 10px; }
+  .title .where { overflow: hidden; text-overflow: ellipsis; }
+  .ghost svg { display: block; }
+
+  /* permiso */
+  .perm { display: none; background: var(--l1); border: 1px solid var(--accent); border-radius: 10px; padding: 12px; text-align: left; }
+  .perm .h { font-weight: 600; margin-bottom: 2px; }
+  .perm .tool { color: var(--fg3); font-size: 12px; margin-bottom: 8px; }
+  .perm pre { font-family: var(--mono); font-size: 12px; background: #0f0f0f; border: 1px solid var(--line); border-radius: 6px;
+              padding: 8px 10px; white-space: pre-wrap; word-break: break-all; color: var(--fg); margin-bottom: 10px; }
+  .perm .btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .perm button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 6px; font-weight: 500; font-size: 13px; }
+  .perm .no { background: var(--l3); color: var(--fg); }
+  .perm .yes { background: #ededed; color: #141414; }
+  .voice .perm { width: 100%; }
+  .voice .orb { transition: width .2s, height .2s; }
+  .perm-on .perm { display: block; }
+  .perm-on .voice .last { display: none; }
+  .perm-on .voice .orb { width: 110px; height: 110px; }
+  .perm-on .key { opacity: .35; }
   .swatches { display: flex; gap: 40px; }
   .swatches small { color: var(--fg3); font-size: 12px; }
   .swatches figure { margin: 0; text-align: center; color: var(--fg2); font-size: 13px; }
@@ -99,6 +137,7 @@
     <button data-s="rec">Grabando</button>
     <button data-s="think">Pensando</button>
     <button data-s="speak" class="on">Hablando</button>
+    <button data-s="perm">Permiso</button>
   </div>
   <span style="margin-left:20px">Servidor:</span>
   <div class="seg" id="net"><button data-c="on" class="on">Conectado</button><button data-c="off">Desconectado</button></div>
@@ -106,11 +145,15 @@
 
 <div class="row">
   <div>
-    <p class="caption"><b>1 · Inicio.</b> Eliges el modelo y empiezas.</p>
+    <p class="caption"><b>1 · Inicio.</b> Eliges la carpeta y el modelo, y empiezas.</p>
     <div class="win">
       <div class="title"><span class="name"><span class="dot"></span>Charlando</span><span></span><span class="right"></span></div>
       <div class="start">
-        <div><h1>Charlando</h1><p>Elige con quién hablar.</p></div>
+        <div><h1>Charlando</h1><p>Elige dónde y con quién hablar.</p></div>
+        <div>
+          <div class="label">Carpeta</div>
+          <div class="folder"><span class="n">mi-proyecto</span><span class="path">~/proyectos/mi-proyecto</span><span class="chev">▾</span></div>
+        </div>
         <div>
           <div class="label">Modelo</div>
           <div class="opts">
@@ -119,7 +162,29 @@
             <div class="opt"><span class="radio"></span><div><div class="n">Claude Opus 5.5</div><div class="d">El más capaz, más lento</div></div></div>
           </div>
         </div>
+        <div class="toggle"><div><div class="n">Razonar</div><div class="d">Claude piensa cuando lo necesita. Más lento.</div></div><span class="sw"></span></div>
         <button class="go">Empezar</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="caption"><b>1b · Elegir carpeta.</b> Recientes, y una nueva para ideas sueltas.</p>
+    <div class="win">
+      <div class="title"><span class="name"><span class="dot"></span>Charlando</span><span></span><span class="right"></span></div>
+      <div class="start" style="justify-content:flex-start;padding-top:60px">
+        <div><h1>Charlando</h1><p>Elige dónde y con quién hablar.</p></div>
+        <div>
+          <div class="label">Carpeta</div>
+          <div class="folder"><span class="n">mi-proyecto</span><span class="path">~/proyectos/mi-proyecto</span><span class="chev">▴</span></div>
+          <div class="menu">
+            <div class="it on"><span class="n">mi-proyecto</span><span class="path">~/proyectos/mi-proyecto</span></div>
+            <div class="it"><span class="n">notas</span><span class="path">~/notas</span></div>
+            <div class="it"><span class="n">trabajo</span><span class="path">~/trabajo/cliente</span></div>
+            <div class="sep"></div>
+            <div class="it new">+ Charla nueva<span class="path">en ~/charlando</span></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -156,20 +221,32 @@
 
 <template id="tpl">
   <div class="title">
-    <span class="name"><span class="dot"></span>Charlando</span>
+    <span class="name" title="~/proyectos/mi-proyecto"><span class="dot"></span><span class="where">mi-proyecto</span></span>
     <div class="seg sm"><button data-v="chat">Chat</button><button data-v="voz">Voz</button></div>
-    <span class="right"><button class="ghost plus" title="Nueva conversación">+</button></span>
+    <span class="right"><button class="ghost" title="Copiar el comando para seguir en la terminal: cd ~/proyectos/mi-proyecto && claude --resume …"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5"/><path d="M9.5 2.5V2A1.5 1.5 0 0 0 8 .5H2A1.5 1.5 0 0 0 .5 2v6A1.5 1.5 0 0 0 2 9.5h.5"/></svg></button><button class="ghost plus" title="Nueva conversación">+</button></span>
   </div>
   <div class="chat">
     <div class="you"><div class="who">Tú</div><div class="text">¿Qué es un span?</div></div>
     <div><div class="who">Claude</div><div>Es un tramo medido de una traza: tiene inicio, fin y atributos. Cada etapa de la cascada sería un span.</div></div>
     <div class="you"><div class="who">Tú</div><div class="text">¿Y cómo veo cuál etapa es la más lenta?</div></div>
     <div data-reply><div class="who">Claude</div><div data-t></div></div>
+    <div class="perm">
+      <div class="h">Claude necesita tu permiso</div>
+      <div class="tool">Ejecutar un comando</div>
+      <pre>git push origin main</pre>
+      <div class="btns"><button class="no">Rechazar</button><button class="yes">Aceptar</button></div>
+    </div>
   </div>
   <div class="voice">
     <canvas class="orb" data-preset="gunmetal" width="320" height="320"></canvas>
     <div class="bigstate" data-big></div>
     <div class="last"><div class="q">«¿Y cómo veo cuál etapa es la más lenta?»</div><div data-reply><span data-t></span></div></div>
+    <div class="perm">
+      <div class="h">Claude necesita tu permiso</div>
+      <div class="tool">Ejecutar un comando</div>
+      <pre>git push origin main</pre>
+      <div class="btns"><button class="no">Rechazar</button><button class="yes">Aceptar</button></div>
+    </div>
   </div>
   <div class="ptt">
     <span class="recdot"></span><span class="state" data-st></span><div class="meter" data-n="14"></div><span class="key">Espacio</span>
@@ -178,8 +255,8 @@
 
 <script>
 const REPLY = "Mira el span de cada etapa: el más largo es tu cuello de botella. Aquí suele ser el ASR.";
-const LABEL = { idle: "Mantén Espacio para hablar", rec: "Grabando… suelta para enviar", think: "Pensando…", speak: "Claude habla…" };
-const BIG = { idle: "Mantén Espacio para hablar", rec: "Te escucho", think: "Pensando…", speak: "Hablando" };
+const LABEL = { idle: "Mantén Espacio para hablar", rec: "Grabando… suelta para enviar", think: "Pensando…", speak: "Claude habla…", perm: "Esperando tu permiso" };
+const BIG = { idle: "Mantén Espacio para hablar", rec: "Te escucho", think: "Pensando…", speak: "Hablando", perm: "Esperando tu permiso" };
 let state = "speak";
 const convs = document.querySelectorAll(".conv");
 convs.forEach(c => {
@@ -192,6 +269,7 @@ function render() {
   document.querySelectorAll("#seg button").forEach(b => b.classList.toggle("on", b.dataset.s === s));
   convs.forEach(c => {
     c.classList.toggle("rec", s === "rec");
+    c.classList.toggle("perm-on", s === "perm");
     c.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("on", b.dataset.v === c.dataset.view));
     c.querySelector("[data-st]").textContent = LABEL[s];
     c.querySelector("[data-big]").textContent = BIG[s];
@@ -200,7 +278,7 @@ function render() {
       m.innerHTML = Array.from({ length: +m.dataset.n }, (_, i) =>
         `<i style="height:${on ? 4 + Math.round(Math.abs(Math.sin(i * 1.7)) * (big ? 34 : 14)) : 4}px"></i>`).join("");
     });
-    c.querySelectorAll("[data-reply]").forEach(e => e.style.visibility = (s === "speak" || s === "idle") ? "" : "hidden");
+    c.querySelectorAll("[data-reply]").forEach(e => e.style.visibility = (s === "speak" || s === "idle" || s === "perm") ? "" : "hidden");
     c.querySelectorAll("[data-t]").forEach(e => e.innerHTML = s === "speak" ? REPLY.slice(0, 52) + '<span class="caret"></span>' : REPLY);
   });
 }
@@ -290,7 +368,7 @@ document.querySelectorAll("canvas.orb").forEach(cv => {
   let tt = 0, ang = 0, last = performance.now();
   (function frame(now) {
     const dt = Math.min(.05, (now - last) / 1000); last = now;
-    const st = cv.dataset.think ? "think" : state;
+    const st = cv.dataset.think ? "think" : (state === "perm" ? "idle" : state);
     const g = target(st, now, base, mode), k = Math.min(1, dt * 7);
     for (const key of ["flow", "speed", "scale", "size", "irid", "contrast"]) cur[key] += (g[key] - cur[key]) * k;
     for (let i = 0; i < 3; i++) cur.light[i] += (g.light[i] - cur.light[i]) * k;
