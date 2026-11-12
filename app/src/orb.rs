@@ -39,7 +39,7 @@ pub fn target(phase: Phase, connected: bool, now: f64, level: f32) -> Look {
     }
     let lv = level.clamp(0.0, 1.0);
     match phase {
-        Phase::Idle => Look { flow: 0.08, speed: 0.15, size: 1.0 + 0.025 * (ms / 650.0).sin() as f32, ..b },
+        Phase::Idle | Phase::Permission => Look { flow: 0.08, speed: 0.15, size: 1.0 + 0.025 * (ms / 650.0).sin() as f32, ..b },
         Phase::Recording => Look { flow: 0.25 + 0.75 * lv, speed: -0.9, scale: 2.4, size: 0.97 - 0.05 * lv, light: rgb(0xff5a5a), ..b },
         Phase::Thinking => Look { flow: 0.15, speed: 0.2, size: 0.94, angle: 1.1 * (ms / 700.0).sin() as f32, ..b },
         Phase::Speaking => Look { flow: 0.2 + 0.8 * lv, speed: 1.0, scale: 1.4, size: 0.96 + 0.07 * lv, ..b },

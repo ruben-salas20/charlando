@@ -15,39 +15,63 @@ use crate::state::State;
 pub const DEFAULT_URL: &str = "ws://127.0.0.1:8765/ws";
 const RETRY: Duration = Duration::from_secs(2);
 
+/// Dónde abrir la conversación.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Where {
+    /// Una carpeta que ya existe, con su ruta absoluta.
+    Folder(String),
+    /// Una carpeta nueva que crea el servidor.
+    New,
+}
+
 /// De la app al servidor.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Out {
-    Start(&'static str, bool),
-    /// Reanuda la conversación con ese id tras perder la conexión.
-    Resume(&'static str, bool, String),
+    Start { place: Where, model: &'static str, thinking: bool },
+    /// Reanuda la conversación `session` de `folder` tras perder la conexión.
+    Resume { folder: String, model: &'static str, thinking: bool, session: String },
     PttStart,
     PttEnd,
+    PermissionReply { id: String, allow: bool },
     /// PCM 16 bits LE, mono, 16 kHz.
     Audio(Vec<u8>),
 }
 
 impl Out {
     fn into_message(self) -> Message {
-        match self {
-            Out::Start(model, thinking) => {
-                Message::text(json!({"type": "start", "model": model, "thinking": thinking}).to_string())
+        let v = match self {
+            Out::Start { place: Where::Folder(folder), model, thinking } => {
+                json!({"type": "start", "folder": folder, "model": model, "thinking": thinking})
             }
-            Out::Resume(model, thinking, session) => Message::text(
-                json!({"type": "start", "model": model, "thinking": thinking, "resume": session}).to_string(),
-            ),
-            Out::PttStart => Message::text(json!({"type": "ptt_start"}).to_string()),
-            Out::PttEnd => Message::text(json!({"type": "ptt_end"}).to_string()),
-            Out::Audio(pcm) => Message::binary(pcm),
-        }
+            Out::Start { place: Where::New, model, thinking } => {
+                json!({"type": "start", "new_folder": true, "model": model, "thinking": thinking})
+            }
+            Out::Resume { folder, model, thinking, session } => {
+                json!({"type": "start", "folder": folder, "model": model, "thinking": thinking, "resume": session})
+            }
+            Out::PttStart => json!({"type": "ptt_start"}),
+            Out::PttEnd => json!({"type": "ptt_end"}),
+            Out::PermissionReply { id, allow } => json!({"type": "permission_reply", "id": id, "allow": allow}),
+            Out::Audio(pcm) => return Message::binary(pcm),
+        };
+        Message::text(v.to_string())
     }
+}
+
+/// Una carpeta reciente de `hello`, o la de `ready`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Folder {
+    pub path: String,
+    pub name: String,
 }
 
 /// Del servidor a la app (los mensajes de texto; el audio va directo al reproductor).
 #[derive(Debug, Clone, PartialEq)]
 pub enum In {
-    /// El id de la conversación, para reanudarla.
-    Ready(String),
+    /// Las carpetas recientes, la más reciente primero, y dónde se crean las charlas nuevas.
+    Hello { folders: Vec<Folder>, charlas: String },
+    /// El id de la conversación, para reanudarla, y la carpeta en la que trabaja Claude.
+    Ready { session: String, folder: Folder },
     State(String),
     Transcript(String),
     Sentence(String),
@@ -55,18 +79,37 @@ pub enum In {
     Error(String),
     /// La conversación que se quería reanudar ya no existe.
     SessionGone,
+    /// La carpeta de `start` no existe. Lleva el mensaje para la pantalla de inicio.
+    FolderMissing(String),
+    Permission { id: String, tool: String, detail: String },
 }
 
 pub fn parse(text: &str) -> Option<In> {
     let v: Value = serde_json::from_str(text).ok()?;
     let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default().to_owned();
     Some(match v.get("type")?.as_str()? {
-        "ready" => In::Ready(s("session")),
+        "hello" => In::Hello {
+            charlas: s("charlas"),
+            folders: v
+                .get("folders")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|f| {
+                    let path = f.get("path")?.as_str()?.to_owned();
+                    let name = f.get("name").and_then(Value::as_str).unwrap_or_default().to_owned();
+                    Some(Folder { path, name })
+                })
+                .collect(),
+        },
+        "ready" => In::Ready { session: s("session"), folder: Folder { path: s("folder"), name: s("name") } },
         "state" => In::State(s("state")),
         "transcript" => In::Transcript(s("text")),
         "sentence" => In::Sentence(s("text")),
         "reply_end" => In::ReplyEnd,
+        "permission" => In::Permission { id: s("id"), tool: s("tool"), detail: s("detail") },
         "error" if s("code") == "session_gone" => In::SessionGone,
+        "error" if s("code") == "folder_missing" => In::FolderMissing(s("message")),
         "error" => In::Error(s("message")),
         _ => return None,
     })
@@ -80,6 +123,15 @@ pub struct Net {
 impl Net {
     pub fn send(&self, msg: Out) {
         let _ = self.tx.send(msg);
+    }
+}
+
+#[cfg(test)]
+impl Net {
+    /// Un `Net` sin red: lo enviado se lee del receptor.
+    pub fn capture() -> (Net, mpsc::UnboundedReceiver<Out>) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        (Net { tx }, rx)
     }
 }
 
@@ -158,7 +210,32 @@ mod tests {
 
     #[test]
     fn parses_every_server_message() {
-        assert_eq!(parse(r#"{"type":"ready","model":"haiku","session":"s1"}"#), Some(In::Ready("s1".into())));
+        assert_eq!(
+            parse(r#"{"type":"hello","folders":[{"path":"/a/proyecto","name":"proyecto"},{"path":"/b"}],"charlas":"/c"}"#),
+            Some(In::Hello {
+                folders: vec![
+                    Folder { path: "/a/proyecto".into(), name: "proyecto".into() },
+                    Folder { path: "/b".into(), name: String::new() },
+                ],
+                charlas: "/c".into(),
+            })
+        );
+        assert_eq!(
+            parse(r#"{"type":"hello","folders":[],"charlas":"/c"}"#),
+            Some(In::Hello { folders: vec![], charlas: "/c".into() })
+        );
+        assert_eq!(
+            parse(r#"{"type":"ready","model":"haiku","session":"s1","folder":"/a/proyecto","name":"proyecto"}"#),
+            Some(In::Ready { session: "s1".into(), folder: Folder { path: "/a/proyecto".into(), name: "proyecto".into() } })
+        );
+        assert_eq!(
+            parse(r#"{"type":"permission","id":"p1","tool":"Bash","detail":"git push origin main"}"#),
+            Some(In::Permission { id: "p1".into(), tool: "Bash".into(), detail: "git push origin main".into() })
+        );
+        assert_eq!(
+            parse(r#"{"type":"error","message":"No existe","code":"folder_missing"}"#),
+            Some(In::FolderMissing("No existe".into()))
+        );
         assert_eq!(parse(r#"{"type":"state","state":"speaking"}"#), Some(In::State("speaking".into())));
         assert_eq!(parse(r#"{"type":"transcript","text":""}"#), Some(In::Transcript(String::new())));
         assert_eq!(parse(r#"{"type":"sentence","text":"Hola."}"#), Some(In::Sentence("Hola.".into())));
@@ -174,10 +251,21 @@ mod tests {
             Message::Text(t) => serde_json::from_str::<Value>(&t).unwrap(),
             _ => panic!(),
         };
-        assert_eq!(text(Out::Start("opus", true)), json!({"type":"start","model":"opus","thinking":true}));
         assert_eq!(
-            text(Out::Resume("opus", false, "s1".into())),
-            json!({"type":"start","model":"opus","thinking":false,"resume":"s1"})
+            text(Out::Start { place: Where::Folder("/a".into()), model: "opus", thinking: true }),
+            json!({"type":"start","folder":"/a","model":"opus","thinking":true})
+        );
+        assert_eq!(
+            text(Out::Start { place: Where::New, model: "haiku", thinking: false }),
+            json!({"type":"start","new_folder":true,"model":"haiku","thinking":false})
+        );
+        assert_eq!(
+            text(Out::Resume { folder: "/a".into(), model: "opus", thinking: false, session: "s1".into() }),
+            json!({"type":"start","folder":"/a","model":"opus","thinking":false,"resume":"s1"})
+        );
+        assert_eq!(
+            text(Out::PermissionReply { id: "p1".into(), allow: false }),
+            json!({"type":"permission_reply","id":"p1","allow":false})
         );
         assert_eq!(text(Out::PttStart), json!({"type":"ptt_start"}));
         assert_eq!(text(Out::PttEnd), json!({"type":"ptt_end"}));
@@ -210,15 +298,14 @@ mod tests {
         while std::time::Instant::now() < deadline {
             if let Ok(e) = ev_rx.recv_timeout(Duration::from_millis(50)) {
                 match e {
-                    Event::Connected(c) => {
-                        s.on_connected(c);
-                        if c {
-                            s.start();
-                        }
-                    }
+                    Event::Connected(c) => s.on_connected(c),
                     Event::Message(m) => {
                         eprintln!("← {m:?}");
+                        let hello = matches!(m, In::Hello { .. });
                         s.on_message(m);
+                        if hello {
+                            s.start();
+                        }
                     }
                 }
             }

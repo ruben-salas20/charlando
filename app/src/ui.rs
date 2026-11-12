@@ -1,9 +1,17 @@
 //! Las pantallas, con los colores, tamaños y textos de maqueta.html.
 
-use rune::{Align, Color, Cursor, Cx, El, Family, ScrollSpec, Span, TextStyle, col, effect, el, rich, row, text};
+use rune::{Align, Color, Cursor, Cx, El, Family, Icon, ScrollSpec, Side, Span, TextStyle, col, effect, el, icon, rich, row, text};
 
+use crate::net::{Folder, Where};
 use crate::orb::ORB;
-use crate::state::{Model, Phase, Screen, State, View, Who};
+use crate::state::{Model, Permission, Phase, Screen, State, View, Who};
+
+/// El icono de copiar de maqueta.html.
+static COPY: Icon = Icon {
+    name: "charlando-copiar",
+    view: 14.0,
+    body: r#"<g fill="none" stroke="currentColor" stroke-width="1.3"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5"/><path d="M9.5 2.5V2A1.5 1.5 0 0 0 8 .5H2A1.5 1.5 0 0 0 .5 2v6A1.5 1.5 0 0 0 2 9.5h.5"/></g>"#,
+};
 
 fn c(hex: &str) -> Color {
     rune::color::hex(hex).unwrap_or(Color::BLACK)
@@ -43,6 +51,11 @@ fn style(size: f32, weight: f32) -> TextStyle {
     TextStyle { line_height: (size * 1.45).round(), ..TextStyle::new(size, weight) }
 }
 
+fn mono(size: f32) -> TextStyle {
+    TextStyle { family: Family::Mono, ..style(size, 400.0) }
+}
+
+
 const BODY: f32 = 14.0;
 
 pub fn view(s: &State, _: &mut Cx<State>) -> El {
@@ -51,24 +64,58 @@ pub fn view(s: &State, _: &mut Cx<State>) -> El {
         Screen::Start => start(s, &p),
         Screen::Conversation => conversation(s, &p),
     };
-    let root = col().key("root").w_full().h_full().fill(p.bg).child(title_bar(s, &p)).child(body);
+    let mut root = col().key("root").w_full().h_full().fill(p.bg).child(title_bar(s, &p)).child(body);
+    if s.screen == Screen::Start && s.folder_menu {
+        root = root
+            .child(el().key("carpetas-fuera").role("none").absolute(0.0, 0.0).w_full().h_full().on_press(|s: &mut State| s.folder_menu = false))
+            .child(folder_menu(s, &p));
+    }
     // Con el foco en un control, Espacio lo pulsaría: aquí se queda para hablar.
     root.on_key(|s: &mut State, ev, tx| crate::on_key(s, ev, tx)).on_key_up(|s: &mut State, ev, _| crate::on_key_up(s, ev))
 }
 
 fn title_bar(s: &State, p: &Pal) -> El {
     let dot = el().key("dot").size(7.0, 7.0).radius(3.5).fill(if s.connected { p.ok } else { p.rec });
-    let name = row()
+    let here = s.folder.as_ref().filter(|_| s.screen == Screen::Conversation);
+    let label = here.map_or("Charlando".to_owned(), |f| f.name.clone());
+    let mut name = row()
         .key("name")
+        .shrink()
+        .min_w(0.0)
         .items_center()
         .gap(8.0)
+        .pr(10.0)
         .child(dot)
-        .child(text("Charlando").font(style(13.0, 600.0)).color(p.fg));
-    let left = row().grow(1.0).items_center().child(name);
-    let mut right = row().grow(1.0).items_center().justify_end();
+        .child(text(label).key("carpeta-actual").font(style(13.0, 600.0)).color(p.fg).truncate());
+    if let Some(f) = here {
+        name = name.help(f.path.clone());
+    }
+    // Ancho base 0 en los dos lados: el selector queda centrado aunque el nombre sea largo.
+    let left = row().w(0.0).grow(1.0).min_w(0.0).items_center().child(name);
+    let mut right = row().w(0.0).grow(1.0).items_center().justify_end().gap(10.0);
     let mut middle = row();
     if s.screen == Screen::Conversation {
         middle = segment(s, p);
+        if s.resume_command().is_some() {
+            right = right.child(
+                row()
+                    .key("copiar")
+                    .role("button")
+                    .label("Copiar el comando para seguir en la terminal")
+                    .help("Copiar el comando para seguir en la terminal")
+                    .px(8.0)
+                    .py(5.0)
+                    .radius(5.0)
+                    .hover(p.l2)
+                    .cursor(Cursor::Pointer)
+                    .on_press_tx(|s: &mut State, tx| {
+                        if let Some(cmd) = s.resume_command() {
+                            tx.copy(cmd);
+                        }
+                    })
+                    .child(icon(&COPY, 14.0).color(p.fg2)),
+            );
+        }
         right = right.child(
             row()
                 .key("plus")
@@ -126,7 +173,7 @@ fn segment(s: &State, p: &Pal) -> El {
 fn start(s: &State, p: &Pal) -> El {
     let heading = col()
         .child(text("Charlando").key("h1").font(style(22.0, 600.0)).color(p.fg))
-        .child(text("Elige con quién hablar.").font(style(BODY, 400.0)).color(p.fg2).mt(4.0));
+        .child(text("Elige dónde y con quién hablar.").font(style(BODY, 400.0)).color(p.fg2).mt(4.0));
     let mut opts = col().key("modelos").role("radiogroup").gap(6.0);
     for m in Model::ALL {
         let on = s.model == m;
@@ -183,7 +230,7 @@ fn start(s: &State, p: &Pal) -> El {
                 .child(text("Claude piensa cuando lo necesita. Más lento.").font(style(12.5, 400.0)).color(p.fg3)),
         )
         .child(switch);
-    let ready = s.connected && !s.starting;
+    let ready = s.connected && !s.starting && s.place.is_some();
     let go = row()
         .key("empezar")
         .role("button")
@@ -207,9 +254,145 @@ fn start(s: &State, p: &Pal) -> El {
         .gap(22.0)
         .justify_center()
         .child(heading)
+        .child(folder_picker(s, p))
         .child(models)
         .child(thinking)
         .child(go)
+}
+
+fn folder_line(f: &Folder, size: f32, weight: f32, color: Color, p: &Pal) -> El {
+    let mut line = row().min_w(0.0).grow(1.0).items_center().gap(10.0).child(text(f.name.clone()).font(style(size, weight)).color(color));
+    if !f.path.is_empty() {
+        line = line.child(text(f.path.clone()).font(mono(11.5)).color(p.fg3).truncate_head());
+    }
+    line
+}
+
+fn folder_picker(s: &State, p: &Pal) -> El {
+    let open = s.folder_menu;
+    let mut trigger = row()
+        .key("carpeta")
+        .role("button")
+        .label("Carpeta")
+        .expanded(open)
+        .items_center()
+        .gap(10.0)
+        .px(12.0)
+        .py(10.0)
+        .radius(8.0)
+        .fill(p.l1)
+        .hover(p.l2)
+        .border(1.0, p.line)
+        .cursor(Cursor::Pointer)
+        .on_press(|s: &mut State| s.folder_menu = !s.folder_menu);
+    if let Some(f) = s.chosen() {
+        trigger = trigger.child(folder_line(&f, BODY, 500.0, p.fg, p));
+    } else {
+        trigger = trigger.child(text("Sin conexión").font(style(BODY, 500.0)).color(p.fg3).grow(1.0));
+    }
+    trigger = trigger.child(text(if open { "▴" } else { "▾" }).font(style(BODY, 400.0)).color(p.fg3));
+    let mut block = col().child(text("Carpeta").font(style(12.0, 400.0)).color(p.fg3).mb(8.0)).child(trigger);
+    if let Some(e) = &s.error {
+        block = block.child(text(e.clone()).key("error").font(style(13.0, 400.0)).color(p.rec).wrap().mt(8.0));
+    }
+    block
+}
+
+fn folder_menu(s: &State, p: &Pal) -> El {
+    let item = |key: String, on: bool| {
+        row()
+            .key(key)
+            .role("menuitem")
+            .items_center()
+            .px(10.0)
+            .py(7.0)
+            .radius(6.0)
+            .fill(if on { p.l3 } else { Color::TRANSPARENT })
+            .hover(p.l3)
+            .cursor(Cursor::Pointer)
+    };
+    let mut menu = col()
+        .key("carpetas")
+        .role("menu")
+        .padding(4.0)
+        .radius(8.0)
+        .fill(p.l2)
+        .border(1.0, p.line)
+        .shadow(12.0, 30.0, Color::BLACK.alpha(0.45));
+    for (i, f) in s.folders.iter().enumerate() {
+        let on = s.place.as_ref() == Some(&Where::Folder(f.path.clone()));
+        let path = f.path.clone();
+        menu = menu.child(
+            item(format!("carpeta-{i}"), on)
+                .label(f.name.clone())
+                .on_press(move |s: &mut State| s.choose(Where::Folder(path.clone())))
+                .child(folder_line(f, BODY, 400.0, p.fg, p)),
+        );
+    }
+    if !s.folders.is_empty() {
+        menu = menu.child(el().h(1.0).mx(6.0).my(4.0).fill(p.line));
+    }
+    menu = menu.child(
+        item("charla-nueva".to_owned(), s.place == Some(Where::New))
+            .label("Charla nueva")
+            .on_press(|s: &mut State| s.choose(Where::New))
+            .child(folder_line(&Folder { name: "+ Charla nueva".to_owned(), path: charlas_path(s) }, BODY, 400.0, p.fg2, p)),
+    );
+    // De borde a borde del bloque «Carpeta» (32 de margen en «inicio»), debajo del selector.
+    menu.pin(Some(32.0), Some(0.0), Some(32.0), None).anchored("carpeta", Side::Bottom, Align::Start, 6.0)
+}
+
+/// «en <charlas>», o nada si el servidor aún no lo dijo.
+fn charlas_path(s: &State) -> String {
+    if s.charlas.is_empty() { String::new() } else { format!("en {}", s.charlas) }
+}
+
+/// Unas 8 líneas de código: un `detail` largo se desplaza y los botones siguen a la vista.
+const DETAIL_MAX_H: f32 = 160.0;
+
+fn permission_card(perm: &Permission, p: &Pal) -> El {
+    let button = |key: &'static str, label: &'static str, fill: Color, hover: Color, color: Color, allow: bool| {
+        row()
+            .key(key)
+            .role("button")
+            .label(label)
+            .px(14.0)
+            .py(6.0)
+            .radius(6.0)
+            .fill(fill)
+            .hover(hover)
+            .cursor(Cursor::Pointer)
+            .on_press(move |s: &mut State| s.answer_permission(allow))
+            .child(text(label).font(style(13.0, 500.0)).color(color))
+    };
+    col()
+        .key("permiso")
+        .w_full()
+        .padding(12.0)
+        .radius(10.0)
+        .fill(p.l1)
+        .border(1.0, p.accent)
+        .child(text("Claude necesita tu permiso").font(style(BODY, 600.0)).color(p.fg).mb(2.0))
+        .child(text(perm.action()).font(style(12.0, 400.0)).color(p.fg3).mb(8.0))
+        .child(
+            col()
+                .key("permiso-detalle")
+                .w_full()
+                .max_h(DETAIL_MAX_H)
+                .mb(10.0)
+                .radius(6.0)
+                .fill(c("#0f0f0f"))
+                .border(1.0, p.line)
+                .scroll(ScrollSpec { stick_bottom: false })
+                .child(col().w_full().px(10.0).py(8.0).child(text(perm.detail.clone()).font(mono(12.0)).color(p.fg).wrap_anywhere())),
+        )
+        .child(
+            row()
+                .gap(8.0)
+                .justify_end()
+                .child(button("rechazar", "Rechazar", p.l3, c("#363636"), p.fg, false))
+                .child(button("aceptar", "Aceptar", c("#ededed"), Color::WHITE, c("#141414"), true)),
+        )
 }
 
 fn phase_label(s: &State) -> &'static str {
@@ -221,6 +404,7 @@ fn phase_label(s: &State) -> &'static str {
         Phase::Recording => "Grabando… suelta para enviar",
         Phase::Thinking => "Pensando…",
         Phase::Speaking => "Claude habla…",
+        Phase::Permission => "Esperando tu permiso",
     }
 }
 
@@ -233,6 +417,7 @@ fn big_label(s: &State) -> &'static str {
         Phase::Recording => "Te escucho",
         Phase::Thinking => "Pensando…",
         Phase::Speaking => "Hablando",
+        Phase::Permission => "Esperando tu permiso",
     }
 }
 
@@ -287,6 +472,9 @@ fn chat(s: &State, p: &Pal) -> El {
     if let Some(e) = &s.error {
         list = list.child(text(format!("Error: {e}")).key("error").font(style(13.0, 400.0)).color(p.rec).wrap());
     }
+    if let Some(perm) = s.permission.as_ref().filter(|_| s.phase == Phase::Permission) {
+        list = list.child(permission_card(perm, p));
+    }
     col()
         .key("chat")
         .w_full()
@@ -306,7 +494,18 @@ const REPLY_FADE: f32 = 22.0;
 /// Separación entre la pregunta y la respuesta.
 const VOICE_GAP: f32 = 8.0;
 
+/// Lado de la bola en Voz, y con la tarjeta de permiso.
+const ORB_SIZE: f32 = 160.0;
+const ORB_SIZE_PERMISSION: f32 = 110.0;
+
 fn voice(s: &State, p: &Pal) -> El {
+    let view = col().key("voz-vista").w_full().grow(1.0).min_h(0.0).padding(24.0).gap(18.0).center();
+    if let Some(perm) = s.permission.as_ref().filter(|_| s.phase == Phase::Permission) {
+        return view
+            .child(effect(ORB).key("bola").size(ORB_SIZE_PERMISSION, ORB_SIZE_PERMISSION))
+            .child(text(big_label(s)).key("estado-grande").font(style(17.0, 600.0)).color(p.fg).align(Align::Center))
+            .child(permission_card(perm, p));
+    }
     let show_reply = matches!(s.phase, Phase::Speaking | Phase::Idle);
     let mut reply = col().w_full().items_center().pt(REPLY_FADE);
     if show_reply && let Some(r) = s.last_reply() {
@@ -341,15 +540,7 @@ fn voice(s: &State, p: &Pal) -> El {
             text(format!("«{q}»")).key("pregunta").font(style(13.5, 400.0)).color(p.fg3).align(Align::Center).max_lines(QUESTION_LINES),
         );
     }
-    col()
-        .key("voz-vista")
-        .w_full()
-        .grow(1.0)
-        .min_h(0.0)
-        .padding(24.0)
-        .gap(18.0)
-        .center()
-        .child(effect(ORB).key("bola").size(160.0, 160.0))
+    view.child(effect(ORB).key("bola").size(ORB_SIZE, ORB_SIZE))
         .child(text(big_label(s)).key("estado-grande").font(style(17.0, 600.0)).color(p.fg).align(Align::Center))
         .child(last.child(reply))
 }
@@ -370,6 +561,7 @@ fn footer(s: &State, p: &Pal) -> El {
     let rec = s.phase == Phase::Recording;
     let key = row()
         .key("tecla")
+        .opacity(if s.phase == Phase::Permission { 0.35 } else { 1.0 })
         .px(8.0)
         .py(3.0)
         .radius(5.0)
@@ -377,7 +569,7 @@ fn footer(s: &State, p: &Pal) -> El {
         .border(1.0, if rec { Color::TRANSPARENT } else { p.line })
         .child(
             text("Espacio")
-                .font(TextStyle { family: Family::Mono, ..style(11.5, 400.0) })
+                .font(mono(11.5))
                 .color(if rec { Color::WHITE } else { p.fg2 }),
         );
     let mut bar = row().key("pie").w_full().px(14.0).py(12.0).gap(12.0).items_center().border_sides([1.0, 0.0, 0.0, 0.0], p.line);

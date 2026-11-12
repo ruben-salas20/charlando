@@ -1,5 +1,6 @@
-//! `charlando --probar [--turno]`: se conecta, envía `start` y espera `ready`. Con `--turno`
-//! manda además medio segundo de silencio por pulsar para hablar y espera `reply_end`.
+//! `charlando --probar [--turno]`: se conecta, espera `hello`, envía `start` y espera `ready`.
+//! La carpeta es `CHARLANDO_CARPETA_INICIAL`, o la actual. Con `--turno` manda además medio
+//! segundo de silencio por pulsar para hablar y espera `reply_end`.
 //! Sin ventana ni audio: sirve para comprobar el contrato con el servidor.
 
 use std::time::{Duration, Instant};
@@ -8,6 +9,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::net::{In, parse};
+use crate::state::INITIAL_FOLDER_VAR;
 
 pub fn run(url: String) -> i32 {
     let turn = std::env::args().any(|a| a == "--turno");
@@ -31,9 +33,15 @@ async fn probe(url: &str, turn: bool) -> Result<(), String> {
         .map_err(|_| "tiempo agotado al conectar".to_string())?
         .map_err(|e| e.to_string())?;
     println!("conectado a {url} en {} ms", t0.elapsed().as_millis());
-    ws.send(Message::text(r#"{"type":"start","model":"haiku"}"#)).await.map_err(|e| e.to_string())?;
-    println!("→ start haiku");
-    wait(&mut ws, Duration::from_secs(15), |m| matches!(m, In::Ready(_))).await?;
+    wait(&mut ws, Duration::from_secs(5), |m| matches!(m, In::Hello { .. })).await?;
+    let folder = match std::env::var(INITIAL_FOLDER_VAR).ok().filter(|p| !p.is_empty()) {
+        Some(p) => p,
+        None => std::env::current_dir().map_err(|e| e.to_string())?.to_string_lossy().into_owned(),
+    };
+    let start = serde_json::json!({"type": "start", "folder": folder, "model": "haiku"}).to_string();
+    ws.send(Message::text(start)).await.map_err(|e| e.to_string())?;
+    println!("→ start haiku en {folder}");
+    wait(&mut ws, Duration::from_secs(15), |m| matches!(m, In::Ready { .. } | In::FolderMissing(_))).await?;
     if !turn {
         return Ok(());
     }
@@ -64,7 +72,10 @@ where
                         if audio > 0 {
                             println!("  audio recibido: {audio} bytes ({:.2} s a 24 kHz)", audio as f64 / 48_000.0);
                         }
-                        return if let In::Error(e) = m { Err(format!("el servidor dice: {e}")) } else { Ok(()) };
+                        return match m {
+                            In::Error(e) | In::FolderMissing(e) => Err(format!("el servidor dice: {e}")),
+                            _ => Ok(()),
+                        };
                     }
                     Some(_) => {}
                     None => return Err(format!("mensaje fuera del protocolo: {t}")),
