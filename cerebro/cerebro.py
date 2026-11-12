@@ -30,6 +30,7 @@ ESPERA_AVISO = float(os.environ.get("CHARLANDO_ESPERA_AVISO", 3))
 CONFIG = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "charlando")
 RECIENTES = os.path.join(CONFIG, "recientes.json")
 MAX_RECIENTES = 8
+CIERRE_OTRO_CLIENTE = 4001  # PROTOCOLO: la app que lo recibe no reintenta sola
 
 MODELOS = {"haiku", "sonnet", "opus"}
 REGLAS_VOZ = ("Hablas con la persona por voz, en español: tus respuestas se leen en voz alta. "
@@ -737,7 +738,7 @@ async def atender(ws):
         return
     if ACTIVA is not None:
         log.info("Llega otro cliente: se cierra la conexión anterior")
-        await ACTIVA.ws.close(1000, "otro cliente")
+        await ACTIVA.ws.close(CIERRE_OTRO_CLIENTE, "otro cliente")
     sesion = Sesion(ws)
     ACTIVA = sesion
     log.info("Cliente conectado")

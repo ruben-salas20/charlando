@@ -18,6 +18,14 @@ Maqueta interactiva: `maqueta.html` (abrir en un navegador con WebGL); la del te
    - Dos botones: «Rechazar» (gris) y «Aceptar» (claro).
    - En Chat va debajo de la última respuesta. En Voz sustituye al texto, y la bola se hace más pequeña.
 
+4. **Abierto en otro dispositivo** (estado `taken` del protocolo). Otra app se ha conectado al cerebro y se ha quedado la conexión:
+   - El punto de la barra se pone gris (no rojo: no es un fallo).
+   - **Inicio:** encima del botón aparece el texto «Charlando está abierto en otro dispositivo.» y el botón «Empezar» pasa a decir «Usar aquí».
+   - **Chat:** el pie muestra «Abierto en otro dispositivo» y, a la derecha, el botón «Usar aquí» en lugar de la tecla Espacio y el nivel de audio.
+   - **Voz:** la bola, apagada como en desconectado; debajo, «Abierto en otro dispositivo» y el botón «Usar aquí».
+   - En el teléfono, el botón grande de hablar pasa a ser «Usar aquí».
+   - «Usar aquí» usa el estilo del botón «Empezar». Al pulsarlo, la app vuelve a conectar y la otra pasa a este estado.
+
 ## Comportamiento
 
 - Pulsar para hablar: mantener Espacio graba y soltarlo envía.
@@ -42,3 +50,4 @@ Efecto `LiquidMetalParams` de `rune-fx`, preset **gunmetal**. El nivel de voz mu
 | Hablando | Ondas hacia fuera y crece con el volumen de la voz de Claude |
 | Esperando permiso | Como en espera, pero más pequeña, para dejar sitio a la tarjeta. Texto: «Esperando tu permiso» |
 | Desconectado | Quieta, más pequeña y apagada (`flow` 0, más contraste) |
+| Abierto en otro dispositivo | Igual que desconectado |

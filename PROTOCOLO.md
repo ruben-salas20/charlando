@@ -8,9 +8,10 @@ El cerebro no hace ASR ni TTS: se los pide al servicio de voz (`voz/`). Ese cont
 ## Conexión
 
 - URL: `ws://<host>:<puerto>/ws`. La app la lee de la variable `CHARLANDO_URL` (por defecto `ws://127.0.0.1:8765/ws`); el cerebro escucha donde digan `CHARLANDO_HOST` y `CHARLANDO_PORT` en su `.env`.
-- El cerebro atiende **un cliente a la vez**: si llega otro, cierra la conexión anterior.
+- El cerebro atiende **un cliente a la vez**: si llega otro, cierra la conexión anterior con el código de cierre WebSocket **4001** y el motivo `otro cliente`.
+- La app que recibe el cierre 4001 **no reintenta sola**: pasa al estado `taken` y espera a que la persona pulse «Usar aquí». Así dos apps abiertas a la vez no se echan una a otra sin fin. Con cualquier otro cierre o fallo de red, reintenta como siempre.
 - Al abrirse la conexión, el cerebro envía `hello` con las carpetas recientes. Lo vuelve a enviar justo después de cada `ready`, con la lista actualizada.
-- La app reintenta cada 2 s mientras no hay conexión. El punto de la barra está verde con el socket abierto y rojo si no.
+- La app reintenta cada 2 s mientras no hay conexión, salvo en el estado `taken`. El punto de la barra está verde con el socket abierto y rojo si no.
 
 ## Mensajes
 
@@ -84,6 +85,7 @@ Reglas de la tarjeta:
 - Un turno puede alternar `speaking` → `thinking` → `speaking` cuando Claude usa herramientas. La app pasa a `thinking` cuando termina de sonar el audio en cola, y todas las frases del turno van a la misma burbuja de Claude.
 - **`permission`** es un estado de la app. Un mensaje `permission` solo se acepta en `thinking` o `speaking`; en otro estado se ignora. El estado entra cuando termina de sonar el audio en cola, y sale al pulsar un botón (pasa a `thinking`). En este estado la app muestra la tarjeta e ignora Espacio.
 - En `thinking`, `speaking` y `permission`, la app ignora Espacio: en esta versión no se interrumpe a Claude.
+- Si el cerebro cierra con 4001, la app pasa a `taken`: conserva la pantalla y la conversación, no reintenta e ignora Espacio. «Usar aquí» vuelve a conectar, y desde ahí sigue como una reconexión normal (con `resume` si estaba en una conversación). El turno en curso y la tarjeta de permiso se pierden.
 - Si se cae la conexión, la app pasa a `disconnected` y conserva la conversación en pantalla. El turno en curso y la tarjeta de permiso se pierden. La tarjeta también se pierde con «+» o con un `error`, que además termina el turno.
 - Al reconectar dentro de una conversación, la app envía `start` con `folder` y `resume`, y no deja hablar hasta recibir `ready`. Si aún no se había dicho nada, no hay nada que reanudar: envía un `start` normal con la misma carpeta y el mismo modelo.
 
