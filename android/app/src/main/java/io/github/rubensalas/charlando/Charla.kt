@@ -44,6 +44,8 @@ class Charla(app: Application) : AndroidViewModel(app) {
         private set
     /** La primera vez no hay dirección: se abren los ajustes solos. */
     var settingsOpen by mutableStateOf(url.isEmpty())
+    /** La hoja para elegir carpeta en el inicio. */
+    var foldersOpen by mutableStateOf(false)
 
     init {
         red.connect(url)
