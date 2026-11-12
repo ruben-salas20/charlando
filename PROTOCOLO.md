@@ -66,7 +66,7 @@ El cerebro decide qué herramientas piden permiso:
 
 Las herramientas que necesitan una interfaz que Charlando no tiene (`AskUserQuestion`, `EnterPlanMode`, `ExitPlanMode`) están desactivadas.
 
-Los permisos que el usuario ya tenga en sus ajustes de Claude Code (`permissions.allow` y `permissions.deny`) se aplican antes que esta tabla.
+Los permisos que el usuario ya tenga en sus ajustes de Claude Code (`permissions.allow` y `permissions.deny`) se aplican antes que esta tabla. Además, Claude Code aprueba por su cuenta los comandos de solo lectura (`ls`, `cat`, `git status`…): esos no muestran tarjeta, igual que leer un archivo.
 
 Reglas de la tarjeta:
 - **Solo se responde con el ratón o el dedo.** La voz no acepta ni rechaza nada.

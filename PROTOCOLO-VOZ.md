@@ -37,12 +37,14 @@ Cada petición lleva un `id` que pone el cerebro. La respuesta repite ese `id`.
 | binario, **24 kHz** | Audio de la frase que se está sintetizando, en trozos de cualquier tamaño, en orden |
 | `{"type":"tts_end","id":"<id>"}` | No llega más audio de esa frase |
 | `{"type":"cancelled"}` | Tras `cancel`: ya no llega más audio de nada pedido antes |
-| `{"type":"error","id":"<id>","message":"..."}` | Falló esa petición. `id` falta si el error no es de una petición concreta |
+| `{"type":"error","id":"<id>","message":"..."}` | Falló esa petición. `id` falta si el error no es de una petición concreta. Un `error` de un `tts` cierra esa frase: después no llega su `tts_end` |
 
 ## Orden
 
 - La GPU trabaja en serie. Las frases se sintetizan en el orden en que llegaron sus `tts`.
 - El audio binario siempre pertenece a la frase más antigua que aún no ha recibido su `tts_end`. Por eso el binario no lleva `id`.
+- `cancelled` cierra todas las frases pedidas antes del `cancel`, sin `tts_end`. El audio que llegue entre `cancel` y `cancelled` se descarta.
+- `cancel` no toca las transcripciones. Un `asr_start` nuevo con otra transcripción abierta descarta la anterior. Un `asr_end` con un `id` que no es el de la transcripción abierta recibe `error`.
 - El cerebro puede enviar varios `tts` seguidos sin esperar: así la frase siguiente se sintetiza mientras suena la anterior.
 - Un `asr_end` se atiende después de las frases que ya estaban en cola. En la práctica no hay cola en ese momento: la app solo deja hablar en `idle`.
 
