@@ -81,7 +81,7 @@ class OrbParams(
 fun target(phase: Phase, connected: Boolean, now: Double, lv: Float): OrbParams {
     if (!connected) return OrbParams(0f, 0f, 1.6f, .88f, 0f, CONTRAST * 1.9f, LIGHT)
     return when (phase) {
-        Phase.Idle -> OrbParams(.08f, .15f, 1.6f, 1f + .025f * sin(now / 650).toFloat(), IRID, CONTRAST, LIGHT)
+        Phase.Idle, Phase.Permission -> OrbParams(.08f, .15f, 1.6f, 1f + .025f * sin(now / 650).toFloat(), IRID, CONTRAST, LIGHT)
         Phase.Recording -> OrbParams(.25f + .75f * lv, -.9f, 2.4f, .97f - .05f * lv, IRID, CONTRAST, REC_LIGHT)
         Phase.Thinking -> OrbParams(.15f, .2f, 1.6f, .94f, IRID, CONTRAST, LIGHT)
         Phase.Speaking -> OrbParams(.2f + .8f * lv, 1f, 1.4f, .96f + .07f * lv, IRID, CONTRAST, LIGHT)

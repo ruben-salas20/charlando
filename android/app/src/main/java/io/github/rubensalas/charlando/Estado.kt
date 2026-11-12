@@ -19,7 +19,8 @@ enum class Model(val id: String, val title: String, val blurb: String) {
 
 enum class Screen { Start, Conversation }
 enum class View { Chat, Voice }
-enum class Phase { Idle, Recording, Thinking, Speaking }
+/** `Permission`: la tarjeta de permiso está abierta. */
+enum class Phase { Idle, Recording, Thinking, Speaking, Permission }
 enum class Who { You, Claude }
 
 data class Message(val who: Who, val text: String)
@@ -62,6 +63,15 @@ class Estado(
     var view by mutableStateOf(store.loadView())
         internal set
     var model by mutableStateOf(Model.Haiku)
+    /** Las carpetas recientes del último `hello`. */
+    val folders = mutableStateListOf<Folder>()
+    /** La carpeta elegida en el inicio; nula es «Charla nueva». */
+    var folder by mutableStateOf<Folder?>(null)
+        private set
+    /** La persona eligió carpeta: un `hello` nuevo ya no la cambia. */
+    private var folderChosen = false
+    /** La carpeta de la conversación abierta, la del último `ready`. */
+    var current by mutableStateOf<Folder?>(null)
     /** Interruptor «Razonar»: Claude decide cuándo razonar. */
     var thinking by mutableStateOf(store.loadThinking())
         private set
@@ -80,6 +90,8 @@ class Estado(
     var replyStarted = false
     /** Llegó `thinking` mientras sonaba la voz: se pasa a Pensando cuando termine de sonar. */
     var pendingThinking = false
+    /** Permiso pedido: la tarjeta se abre cuando termina de sonar el audio en cola. */
+    var permission by mutableStateOf<In.Permission?>(null)
     var error by mutableStateOf<String?>(null)
     /** Nivel de audio 0..1 que se dibuja (micrófono o voz de Claude). */
     var level by mutableFloatStateOf(0f)
@@ -93,7 +105,21 @@ class Estado(
     fun start() {
         if (!connected || starting) return
         starting = true
-        send(Out.Start(model.id, thinking))
+        send(Out.Start(folder?.path, model.id, thinking))
+    }
+
+    fun chooseFolder(f: Folder?) {
+        folder = f
+        folderChosen = true
+    }
+
+    /** «Aceptar» o «Rechazar» en la tarjeta. */
+    fun answer(allow: Boolean) {
+        val p = permission ?: return
+        if (phase != Phase.Permission) return
+        send(Out.PermissionReply(p.id, allow))
+        permission = null
+        phase = Phase.Thinking
     }
 
     fun toggleThinking() {
@@ -107,8 +133,10 @@ class Estado(
         screen = Screen.Start
         starting = false
         session = null
+        current = null
         resuming = false
         phase = Phase.Idle
+        permission = null
         messages.clear()
         replyEnded = false
         error = null
@@ -151,35 +179,45 @@ class Estado(
         starting = false
         resuming = false
         phase = Phase.Idle
+        permission = null
         replyEnded = false
         if (!isConnected || screen != Screen.Conversation) return
         // PROTOCOLO: al reconectar en una conversación, se reanuda. Sin nada dicho aún no hay
-        // sesión que reanudar: se abre otra con el mismo modelo.
+        // sesión que reanudar: se abre otra con la misma carpeta y el mismo modelo.
         error = null
         val id = session
+        val path = current?.path ?: folder?.path
         if (id != null && messages.isNotEmpty()) {
             resuming = true
-            send(Out.Start(model.id, thinking, id))
+            send(Out.Start(path, model.id, thinking, id))
         } else {
             starting = true
-            send(Out.Start(model.id, thinking))
+            send(Out.Start(path, model.id, thinking))
         }
     }
 
     fun onMessage(msg: In) {
         when (msg) {
+            is In.Hello -> {
+                folders.clear()
+                folders.addAll(msg.folders)
+                if (!folderChosen) folder = msg.folders.firstOrNull()
+            }
             is In.Ready -> if (resuming) {
                 session = msg.session
+                current = msg.folder
                 resuming = false
             } else if (starting) {
                 session = msg.session
+                current = msg.folder
                 starting = false
                 screen = Screen.Conversation
                 phase = Phase.Idle
                 messages.clear()
                 error = null
             }
-            is In.State -> when (msg.state) {
+            // Con la tarjeta abierta solo la saca un botón.
+            is In.State -> if (phase != Phase.Permission) when (msg.state) {
                 "thinking" -> when (phase) {
                     Phase.Speaking -> pendingThinking = true
                     Phase.Recording -> {}
@@ -206,10 +244,16 @@ class Estado(
                 }
             }
             In.ReplyEnd -> replyEnded = true
+            is In.Permission -> if (phase != Phase.Idle && phase != Phase.Recording) permission = msg
             In.SessionGone -> newConversation()
+            is In.FolderMissing -> {
+                newConversation()
+                error = msg.message
+            }
             is In.Error -> {
                 error = msg.message
                 replyEnded = true
+                permission = null
             }
         }
     }
@@ -217,9 +261,15 @@ class Estado(
     /** Cada fotograma: nivel de audio y fin de la reproducción. True si cambió algo visible. */
     fun tick(t: Double): Boolean {
         var changed = false
-        if (replyEnded && (phase == Phase.Thinking || phase == Phase.Speaking) && player.isEmpty()) {
+        val busy = phase == Phase.Thinking || phase == Phase.Speaking
+        if (replyEnded && (busy || phase == Phase.Permission) && player.isEmpty()) {
             phase = Phase.Idle
             replyEnded = false
+            pendingThinking = false
+            permission = null
+            changed = true
+        } else if (permission != null && busy && player.isEmpty()) {
+            phase = Phase.Permission
             pendingThinking = false
             changed = true
         } else if (pendingThinking && phase == Phase.Speaking && player.isEmpty()) {
