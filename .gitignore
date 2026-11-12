@@ -1,5 +1,6 @@
 app/target/
 servidor/.venv
+cerebro/.venv
 __pycache__/
 .env
 *.wav
